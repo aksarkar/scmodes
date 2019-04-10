@@ -1,0 +1,15 @@
+* Investigation of single cell modes
+
+  This repository (and accompanying repository singlecell-modes) contains code
+  accompanying the manuscript:
+
+  Sarkar, AK and Stephens, M. "Common pitfalls in the analysis of scRNA-seq
+  data".
+
+  To install the package:
+
+  #+BEGIN_SRC sh
+    pip install git+https://www.github.com/aksarkar/scmodes.git#egg=scmodes
+  #+END_SRC
+
+  
