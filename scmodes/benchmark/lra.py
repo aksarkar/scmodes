@@ -1,25 +1,8 @@
 import itertools
 import numpy as np
 import pandas as pd
-import scaa
 import scipy.sparse as ss
 import scipy.stats as st
-import torch
-import wlra
-
-def simulate_pois(n, p, rank, eta_max=None, holdout=None, seed=0):
-  np.random.seed(seed)
-  l = np.random.normal(size=(n, rank))
-  f = np.random.normal(size=(rank, p))
-  eta = l.dot(f)
-  if eta_max is not None:
-    # Scale the maximum value
-    eta *= eta_max / eta.max()
-  x = np.random.poisson(lam=np.exp(eta))
-  if holdout is not None:
-    mask = np.random.uniform(size=(n, p)) < holdout
-    x = np.ma.masked_array(x, mask=mask)
-  return x, eta
 
 def training_score_oracle(x, eta):
   return st.poisson(mu=np.exp(eta)).logpmf(x).sum()
@@ -107,23 +90,10 @@ def training_score_scvi(train, **kwargs):
                    m.test_set.sequential().imputation()])
   return st.poisson(mu=lam).logpmf(train).sum()
 
-def training_score_zipvae(train, lr=1e-2, max_epochs=100, **kwargs):
-  import scaa
-  import torch
-  if not torch.cuda.is_available():
-    return np.nan
-  # scVI does not play nicely
-  with torch.autograd.set_grad_enabled(True):
-    training_data = get_data_loader(train, **kwargs)
-    with torch.cuda.device(0):
-      model = scaa.modules.ZIPVAE(train.shape[1], 10).fit(training_data, lr=lr, max_epochs=max_epochs)
-      lam = model.denoise(training_data)
-    return st.poisson(mu=lam).logpmf(train).sum()
-
 def evaluate_training(rank=3, eta_max=2, num_trials=10):
   result = []
   for trial in range(num_trials):
-    x, eta = simulate_pois(n=200, p=300, rank=rank, eta_max=eta_max, seed=trial)
+    x, eta = scmodes.dataset.simulate_pois(n=200, p=300, rank=rank, eta_max=eta_max, seed=trial)
     result.append([
       trial,
       training_score_oracle(x, eta),
@@ -288,43 +258,6 @@ def generalization_score_dca(train, test, **kwargs):
   scanpy.api.pp.dca(data, mode='denoise')
   lam = data.X
   return pois_llik(lam, train, test)
-
-def get_data_loader(x, dtype=torch.float, batch_size=25, shuffle=False, **kwargs):
-  import scaa
-  import torch.utils.data
-  if ss.issparse(x):
-    x = scaa.dataset.SparseDataset(x)
-  else:
-    x = torch.tensor(x, dtype=dtype)
-  return torch.utils.data.DataLoader(x, batch_size=batch_size, shuffle=shuffle)
-
-def generalization_score_zipvae(train, test, lr=1e-2, max_epochs=100, **kwargs):
-  import scaa
-  import torch
-  if not torch.cuda.is_available():
-    return np.nan
-  # scVI does not play nicely
-  with torch.autograd.set_grad_enabled(True):
-    training_data = get_data_loader(train, **kwargs)
-    with torch.cuda.device(0):
-      model = scaa.modules.ZIPVAE(train.shape[1], 10).fit(training_data, lr=lr, max_epochs=max_epochs)
-      lam = model.denoise(training_data)
-    return pois_llik(lam, train, test)
-
-def generalization_score_zipaae(train, test, y, lr=1e-2, max_epochs=10, **kwargs):
-  import scaa
-  import torch
-  import torch.utils.data
-  if not torch.cuda.is_available():
-    return np.nan
-  # scVI does not play nicely
-  with torch.autograd.set_grad_enabled(True):
-    training_data = get_data_loader(train, **kwargs)
-    labels = get_data_loader(y, dtype=torch.long, **kwargs)
-    with torch.cuda.device(0):
-      model = scaa.modules.ZIPAAE(train.shape[1], 10, num_classes=(y.max() + 1)).fit(training_data, labels, lr=lr, max_epochs=max_epochs)
-      lam = model.denoise(training_data)
-    return pois_llik(lam, train, test)
 
 def generalization_score_lda(train, test, n_components=10, learning_method='online', batch_size=100, **kwargs):
   import sklearn.decomposition
