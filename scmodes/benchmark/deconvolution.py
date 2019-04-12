@@ -157,11 +157,9 @@ def score_npmle(x_train, x_test, pool, K=100, **kwargs):
   result = pool.starmap(f, zip(x_train.T, x_test.T))
   return np.array(result).ravel()
 
-def evaluate_generalization(x, pool, methods=None, **kwargs):
+def evaluate_deconv_generalization(x, pool, methods, **kwargs):
   result = {}
   train, val = skms.train_test_split(x, **kwargs)
-  if methods is None:
-    methods = ['nb', 'zinb', 'unimix', 'descend', 'npmle']
   for m in methods:
     # Hack: get functions by name
     result[m] = getattr(sys.modules[__name__], f'score_{m}')(train, val, pool=pool)
