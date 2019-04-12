@@ -73,31 +73,29 @@ def score_point_gamma(x_train, x_test, **kwargs):
 
 def _score_unimodal(train, test, train_size_factor, test_size_factor):
   lam = train / train_size_factor
-  try:
-    res0 = ashr.ash_workhorse(
-      # these are ignored by ash
-      pd.Series(np.zeros(train.shape)),
-      1,
-      outputlevel='fitted_g',
-      # numpy2ri doesn't DTRT, so we need to use pandas
-      lik=ashr.lik_pois(y=pd.Series(train), scale=train_size_factor, link='identity'),
-      mode=pd.Series([lam.min(), lam.max()]))
-    res = ashr.ash_workhorse(
-      pd.Series(np.zeros(test.shape)),
-      1,
-      lik=ashr.lik_pois(y=pd.Series(test), scale=test_size_factor, link='identity'),
-      fixg=True,
-      g=res0.rx2('fitted_g'))
-    ret = np.array(res.rx2('loglik'))
-  except:
-    ret = -np.inf
-  return ret
+  res0 = ashr.ash_workhorse(
+    # these are ignored by ash
+    pd.Series(np.zeros(train.shape)),
+    1,
+    outputlevel='fitted_g',
+    # numpy2ri doesn't DTRT, so we need to use pandas
+    lik=ashr.lik_pois(y=pd.Series(train), scale=train_size_factor, link='identity'),
+    mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
+    mode=pd.Series([lam.min(), lam.max()]))
+  res = ashr.ash_workhorse(
+    pd.Series(np.zeros(test.shape)),
+    1,
+    outputlevel='loglik',
+    lik=ashr.lik_pois(y=pd.Series(test), scale=test_size_factor, link='identity'),
+    fixg=True,
+    g=res0.rx2('fitted_g'))
+  return np.array(res.rx2('loglik'))
 
 def score_unimodal(x_train, x_test, pool, **kwargs):
   result = []
   train_size_factor = pd.Series(x_train.sum(axis=1))
   test_size_factor = pd.Series(x_test.sum(axis=1))
-  f = ft.partial(_score_unimix, train_size_factor=train_size_factor,
+  f = ft.partial(_score_unimodal, train_size_factor=train_size_factor,
                  test_size_factor=test_size_factor)
   # np iterates over rows
   result = pool.starmap(f, zip(x_train.T, x_test.T))
@@ -133,25 +131,22 @@ def score_zief(x_train, x_test, pool, **kwargs):
 def _score_npmle(train, test, train_size_factor, test_size_factor, K=100):
   lam = train / train_size_factor
   grid = np.linspace(0, lam.max(), K + 1)
-  try:
-    res0 = ashr.ash_workhorse(
-      # these are ignored by ash
-      pd.Series(np.zeros(train.shape)),
-      1,
-      outputlevel='fitted_g',
-      # numpy2ri doesn't DTRT, so we need to use pandas
-      lik=ashr.lik_pois(y=pd.Series(train), scale=train_size_factor, link='identity'),
-      g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
-    res = ashr.ash_workhorse(
-      pd.Series(np.zeros(test.shape)),
-      1,
-      lik=ashr.lik_pois(y=pd.Series(test), scale=test_size_factor, link='identity'),
-      fixg=True,
-      g=res0.rx2('fitted_g'))
-    ret = res.rx2('loglik')
-  except:
-    ret = -np.inf
-  return ret
+  res0 = ashr.ash_workhorse(
+    # these are ignored by ash
+    pd.Series(np.zeros(train.shape)),
+    1,
+    outputlevel='fitted_g',
+    # numpy2ri doesn't DTRT, so we need to use pandas
+    lik=ashr.lik_pois(y=pd.Series(train), scale=train_size_factor, link='identity'),
+    g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
+  res = ashr.ash_workhorse(
+    pd.Series(np.zeros(test.shape)),
+    1,
+    outputlevel='loglik',
+    lik=ashr.lik_pois(y=pd.Series(test), scale=test_size_factor, link='identity'),
+    fixg=True,
+    g=res0.rx2('fitted_g'))
+  return np.array(res.rx2('loglik'))
 
 def score_npmle(x_train, x_test, pool, K=100, **kwargs):
   result = []
