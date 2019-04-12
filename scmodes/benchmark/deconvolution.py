@@ -24,7 +24,7 @@ def nb_llik(x, mean, inv_disp):
           sp.gammaln(inv_disp) -
           sp.gammaln(x + 1))
 
-def score_nb(x_train, x_test, **kwargs):
+def score_gamma(x_train, x_test, **kwargs):
   # This depends on tensorflow, which will fail on import when run on compute
   # nodes without a GPU. We guard against this in evaluate_generalization by
   # specifying `methods`.
@@ -49,7 +49,7 @@ def zinb_llik(x, mean, inv_disp, logodds):
   case_non_zero = -softplus(logodds) + nb_llik(x, mean, inv_disp)
   return np.where(x < 1, case_zero, case_non_zero)
 
-def score_zinb(x_train, x_test, **kwargs):
+def score_point_gamma(x_train, x_test, **kwargs):
   # This depends on tensorflow, which will fail on import when run on compute
   # nodes without a GPU. We guard against this in evaluate_generalization by
   # specifying `methods`.
@@ -125,12 +125,12 @@ def score_zief(x_train, x_test, pool, **kwargs):
   # numpy2ri doesn't DTRT, so we need to use pandas
   train_size_factor = pd.Series(x_train.sum(axis=1))
   test_size_factor = x_test.sum(axis=1).reshape(-1, 1)
-  f = ft.partial(_score_descend, train_size_factor=train_size_factor,
+  f = ft.partial(_score_zief, train_size_factor=train_size_factor,
                  test_size_factor=test_size_factor)
   result = pool.starmap(f, zip(x_train.T, x_test.T))
   return np.array(result).ravel()
 
-def _score_npmle(train, test, train_size_factor, test_size_factor, K):
+def _score_npmle(train, test, train_size_factor, test_size_factor, K=100):
   lam = train / train_size_factor
   grid = np.linspace(0, lam.max(), K + 1)
   try:
