@@ -1,4 +1,4 @@
-import scaa
+import scmodes
 import numpy as np
 import pytest
 
@@ -13,14 +13,14 @@ def dims():
 
 @pytest.fixture
 def simulate():
-  return scaa.benchmark.simulate_pois(n=30, p=60, rank=1, eta_max=3)
+  return scmodes.dataset.simulate_pois(n=30, p=60, rank=1, eta_max=3)
 
 @pytest.fixture
 def simulate_holdout():
-  return scaa.benchmark.simulate_pois(n=200, p=300, rank=1, eta_max=3, holdout=.1)
+  return scmodes.dataset.simulate_pois(n=200, p=300, rank=1, eta_max=3, holdout=.1)
   
 @pytest.fixture
 def simulate_train_test():
-  x, eta = scaa.benchmark.simulate_pois(n=200, p=300, rank=1, eta_max=3)
-  train, test = scaa.benchmark.train_test_split(x)
+  x, eta = scmodes.dataset.simulate_pois(n=200, p=300, rank=1, eta_max=3)
+  train, test = scmodes.benchmark.train_test_split(x)
   return train, test, eta

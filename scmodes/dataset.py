@@ -55,8 +55,8 @@ def synthetic_mix(x1, x2):
   y[:x1.shape[0]] = 1
   return x, y
 
-def cortex(return_df=False):
-  counts = pd.read_csv('/project2/mstephens/aksarkar/projects/singlecell-ideas/data/zeisel-2015/GSE60361_C1-3005-Expression.txt.gz', index_col=0, sep='\t')
+def cortex(path, return_df=False):
+  counts = pd.read_csv(path, index_col=0, sep='\t')
   # Follow scVI here
   subset = counts.loc[counts.var(axis=1).sort_values(ascending=False).head(n=500).index].T
   if return_df:
