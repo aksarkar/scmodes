@@ -102,10 +102,15 @@ def score_unimodal(x_train, x_test, pool, **kwargs):
   return np.array(result).ravel()
 
 def _score_zief(train, test, train_size_factor, test_size_factor):
-  res = descend.deconvSingle(pd.Series(train), scaling_consts=train_size_factor, verbose=False)
+  try:
+    res = descend.deconvSingle(pd.Series(train), scaling_consts=train_size_factor, verbose=False)
+  except:
+    # DESCEND refuses to run on some datasets (not enough non-zero counts, or
+    # not high enough mean count)
+    return np.nan
   # DESCEND returns NA on errors
   if tuple(res.rclass) != ('DESCEND',):
-    return -np.inf
+    return np.nan
   g = np.array(res.slots['distribution'])[:,:2]
   # Don't marginalize over lambda = 0 for x > 0, because
   # p(x > 0 | lambda = 0) = 0
