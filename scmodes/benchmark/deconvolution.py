@@ -73,6 +73,9 @@ def score_point_gamma(x_train, x_test, **kwargs):
 
 def _score_unimodal(train, test, train_size_factor, test_size_factor):
   lam = train / train_size_factor
+  if np.isclose(lam.min(), lam.max()):
+    # No variation
+    return np.nan
   res0 = ashr.ash_workhorse(
     # these are ignored by ash
     pd.Series(np.zeros(train.shape)),
