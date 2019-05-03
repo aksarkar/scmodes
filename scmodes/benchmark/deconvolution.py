@@ -75,7 +75,7 @@ def _score_unimodal(train, test, train_size_factor, test_size_factor):
   lam = train / train_size_factor
   if np.isclose(lam.min(), lam.max()):
     # No variation
-    return np.nan
+    return np.array(np.nan)
   res0 = ashr.ash_workhorse(
     # these are ignored by ash
     pd.Series(np.zeros(train.shape)),
