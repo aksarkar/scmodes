@@ -117,13 +117,13 @@ def _score_zief(train, test, train_size_factor, test_size_factor):
   g = np.array(res.slots['distribution'])[:,:2]
   # Don't marginalize over lambda = 0 for x > 0, because
   # p(x > 0 | lambda = 0) = 0
-  case_nonzero = (st.poisson(mu=test_size_factor * g[1:,0])
-                  .logpmf(test.reshape(-1, 1))
-                  .dot(g[1:,1]))
-  case_zero = (st.poisson(mu=test_size_factor * g[:,0])
-               .logpmf(test.reshape(-1, 1))
-               .dot(g[:,1]))
-  llik = np.where(test > 0, case_nonzero, case_zero).sum()
+  llik = np.where(test > 0,
+                  np.log(st.poisson(mu=test_size_factor * g[1:,0])
+                         .pmf(test.reshape(-1, 1))
+                         .dot(g[1:,1])),
+                  np.log(st.poisson(mu=test_size_factor * g[:,0])
+                         .pmf(test.reshape(-1, 1))
+                         .dot(g[:,1]))).sum()
   return llik
 
 def score_zief(x_train, x_test, pool, **kwargs):
