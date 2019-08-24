@@ -49,10 +49,13 @@ def ipsc(prefix, return_df=False, query=None, n=None, seed=0):
   else:
     return result.values.T
 
-def synthetic_mix(x1, x2):
+def synthetic_mix(x1, x2, min_detect=None):
   x = pd.concat([x1, x2], axis='index', join='inner')
   y = np.zeros(x.shape[0]).astype(int)
   y[:x1.shape[0]] = 1
+  if min_detect is not None:
+    keep_genes = (x > 0).mean(axis=0) >= min_detect
+    x = x.loc[:,keep_genes]
   return x, y
 
 def cortex(path, return_df=False):
