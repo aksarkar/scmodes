@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scipy.io
+import scipy.special as sp
 
 def simulate_pois(n, p, rank, eta_max=None, holdout=None, seed=0):
   np.random.seed(seed)
@@ -15,6 +16,16 @@ def simulate_pois(n, p, rank, eta_max=None, holdout=None, seed=0):
     mask = np.random.uniform(size=(n, p)) < holdout
     x = np.ma.masked_array(x, mask=mask)
   return x, eta
+
+def simulate_pois_size(n, p, rank, s, seed=0):
+  np.random.seed(seed)
+  l = np.random.normal(size=(n, rank))
+  f = np.random.normal(size=(rank, p))
+  eta = l.dot(f)
+  eta -= sp.logsumexp(eta, axis=0)
+  mu = np.exp(eta)
+  x = np.random.poisson(lam=s * mu)
+  return x, mu
 
 def read_10x(prefix, min_detect=0.25, return_df=False):
   counts = scipy.io.mmread(f'{prefix}/matrix.mtx.gz').tocsr()
