@@ -14,7 +14,7 @@ rpy2.robjects.numpy2ri.activate()
 rpy2.robjects.pandas2ri.activate()
 glmpca = rpy2.robjects.packages.importr('glmpca')
 
-def training_score_nmf(x, n_components=10):
+def training_score_nmf(x, n_components=10, **kwargs):
   m = sklearn.decomposition.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(x)
   return st.poisson(mu=m.transform(x).dot(m.components_)).logpmf(x).sum()
 
@@ -25,12 +25,13 @@ def training_score_lda(x, n_components=10, learning_method='online', batch_size=
   lam = (L / L.sum(axis=0)).dot(F)
   return st.poisson(mu=lam).logpmf(x).sum()
 
-def training_score_glmpca(x, n_components=10, max_restarts=10):
+def training_score_glmpca(x, n_components=10, max_restarts=1, **kwargs):
   # GLMPCA can fail for some (random) initializations, so restart to find one
   # which works
   obj = -np.inf
   for i in range(max_restarts):
     try:
+      print(f'GLMPCA {i}')
       # We use samples x genes, but GLM-PCA expects genes x samples
       res = glmpca.glmpca(x.values.T, L=n_components, fam='poi')
       # Follow GLM-PCA code here, not the paper
@@ -48,7 +49,7 @@ def training_score_glmpca(x, n_components=10, max_restarts=10):
     raise RuntimeError('glmpca failed to converge')
   return obj
 
-def training_score_plra1(x, n_components=10):
+def training_score_plra1(x, n_components=10, **kwargs):
   res = wlra.plra(x.values, rank=n_components, max_iters=50000)
   return st.poisson(mu=np.exp(res)).logpmf(x.values).sum()
 
@@ -91,7 +92,7 @@ def generalization_score_lda(train, test, n_components=10, learning_method='onli
   lam = (L / L.sum(axis=0)).dot(F)
   return pois_llik(lam, train, test)
 
-def generalization_score_glmpca(train, test, n_components=10):
+def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **kwargs):
   # GLMPCA can fail for some (random) initializations, so restart to find one
   # which works
   obj = -np.inf
@@ -114,20 +115,20 @@ def generalization_score_glmpca(train, test, n_components=10):
     raise RuntimeError('glmpca failed to converge')
   return obj
 
-def generalization_score_plra1(train, test, n_components=10):
+def generalization_score_plra1(train, test, n_components=10, **kwargs):
   res = wlra.plra(train.values, rank=n_components, max_iters=50000)
   return st.poisson(mu=np.exp(res)).logpmf(test.values).sum()
 
-def evaluate_lra_generalization(x, methods, n_trials=1):
+def evaluate_lra_generalization(x, methods, n_trials=1, **kwargs):
   result = collections.defaultdict(list)
   for method in methods:
     result[('train', method)] = []
     result[('validation', method)] = []
     for trial in range(n_trials):
       train, val = scmodes.benchmark.train_test_split(x)
-      training_score = getattr(scmodes.benchmark, f'training_score_{method}')(train)
+      training_score = getattr(scmodes.benchmark, f'training_score_{method}')(train, **kwargs)
       result[('train', method)].append(training_score)
-      validation_score = getattr(scmodes.benchmark, f'generalization_score_{method}')(train, val)
+      validation_score = getattr(scmodes.benchmark, f'generalization_score_{method}')(train, val, **kwargs)
       result[('validation', method)].append(validation_score)
   result = pd.DataFrame.from_dict(result)
   result.index.name = 'trial'
