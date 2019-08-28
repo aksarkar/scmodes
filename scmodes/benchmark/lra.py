@@ -16,7 +16,7 @@ glmpca = rpy2.robjects.packages.importr('glmpca')
 
 def training_score_nmf(x, n_components=10, **kwargs):
   m = sklearn.decomposition.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(x)
-  return st.poisson(mu=m.transform(x).dot(m.components_)).logpmf(x).sum()
+  return st.poisson(mu=m.transform(x).dot(m.components_)).logpmf(x).mean()
 
 def _glmpca(x, n_components, max_restarts):
   # GLMPCA can fail for some (random) initializations, so restart to find one
@@ -31,7 +31,7 @@ def _glmpca(x, n_components, max_restarts):
       L = np.array(res.rx2('loadings'))
       F = np.array(res.rx2('factors'))
       lam = np.exp(s + F.T.dot(L))
-      llik = st.poisson(mu=lam).logpmf(x.values).sum()
+      llik = st.poisson(mu=lam).logpmf(x.values).mean()
       print(f'glmpca {i} {llik:.3g}')
       if obj is None or llik > obj:
         obj = llik
@@ -48,7 +48,7 @@ def training_score_glmpca(x, n_components=10, max_restarts=1, **kwargs):
 
 def training_score_plra1(x, n_components=10, **kwargs):
   res = wlra.plra(x.values, rank=n_components, max_iters=50000)
-  return st.poisson(mu=np.exp(res)).logpmf(x.values).sum()
+  return st.poisson(mu=np.exp(res)).logpmf(x.values).mean()
 
 def pois_llik(lam, train, test):
   if ss.issparse(train):
@@ -59,7 +59,7 @@ def pois_llik(lam, train, test):
     lam *= test.values.sum(axis=1, keepdims=True) / train.values.sum(axis=1, keepdims=True)
   else:
     lam *= test.sum(axis=1, keepdims=True) / train.sum(axis=1, keepdims=True)
-  return st.poisson(mu=lam).logpmf(test).sum()
+  return st.poisson(mu=lam).logpmf(test).mean()
 
 def train_test_split(x, p=0.5):
   if ss.issparse(x):
@@ -88,11 +88,11 @@ def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **
   # Follow GLM-PCA paper here
   s1 = np.log(test.values.mean(axis=1, keepdims=True))
   lam = np.exp(s1 - s + F.T.dot(L))
-  return st.poisson(mu=lam).logpmf(test.values).sum()
+  return st.poisson(mu=lam).logpmf(test.values).mean()
 
 def generalization_score_plra1(train, test, n_components=10, **kwargs):
   res = wlra.plra(train.values, rank=n_components, max_iters=50000)
-  return st.poisson(mu=np.exp(res)).logpmf(test.values).sum()
+  return st.poisson(mu=np.exp(res)).logpmf(test.values).mean()
 
 def evaluate_lra_generalization(x, methods, n_trials=1, **kwargs):
   result = collections.defaultdict(list)
