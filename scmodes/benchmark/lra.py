@@ -22,12 +22,12 @@ def _glmpca(x, n_components, max_restarts):
   # GLMPCA can fail for some (random) initializations, so restart to find one
   # which works
   obj = None
+  s = np.log(x.values.mean(axis=1, keepdims=True))
   for i in range(max_restarts):
     try:
       # We use samples x genes, but GLM-PCA expects genes x samples
       res = glmpca.glmpca(x.values.T, L=n_components, fam='poi')
       # Follow GLM-PCA code here, not the paper
-      s = np.log(x.values.mean(axis=1, keepdims=True))
       L = np.array(res.rx2('loadings'))
       F = np.array(res.rx2('factors'))
       lam = np.exp(s + F.T.dot(L))
@@ -39,6 +39,8 @@ def _glmpca(x, n_components, max_restarts):
       print(f'glmpca {i} failed')
       continue
   if obj is None:
+    L = None
+    F = None
     obj = np.nan
   return s, L, F, obj
 
@@ -92,13 +94,14 @@ def generalization_score_nmf(train, test, n_components=10, **kwargs):
   return pois_llik(m.transform(train).dot(m.components_), train, test)
 
 def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **kwargs):
-  s, L, F, llik = _glmpca(train, n_components, max_restarts)
+  _, L, F, llik = _glmpca(train, n_components, max_restarts)
   if np.isnan(llik):
-    print(f'glmpca failed on training data')
-  # Follow GLM-PCA paper here
-  s1 = np.log(test.values.mean(axis=1, keepdims=True))
-  lam = np.exp(s1 - s + F.T.dot(L))
-  return st.poisson(mu=lam).logpmf(test.values).mean()
+    return np.nan
+  else:
+    # Follow GLM-PCA code here
+    s = np.log(test.values.mean(axis=1, keepdims=True))
+    lam = np.exp(s + F.T.dot(L))
+    return st.poisson(mu=lam).logpmf(test.values).mean()
 
 def generalization_score_scvi(train, test, n_components=10, **kwargs):
   from scvi.dataset import GeneExpressionDataset
