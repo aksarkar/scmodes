@@ -46,9 +46,19 @@ def training_score_glmpca(x, n_components=10, max_restarts=1, **kwargs):
   res = _glmpca(x, n_components, max_restarts)
   return res[-1]
 
-def training_score_plra1(x, n_components=10, **kwargs):
-  res = wlra.plra(x.values, rank=n_components, max_iters=50000)
-  return st.poisson(mu=np.exp(res)).logpmf(x.values).mean()
+def training_score_scvi(x, n_components=10, **kwargs):
+  from scvi.dataset import GeneExpressionDataset
+  from scvi.inference import UnsupervisedTrainer
+  from scvi.models import VAE
+  data = GeneExpressionDataset(*GeneExpressionDataset.get_attributes_from_matrix(x.values))
+  vae = VAE(n_input=x.shape[1])
+  m = UnsupervisedTrainer(vae, data, verbose=False)
+  m.train(n_epochs=100)
+  # Training permuted the data for minibatching. Unpermute before "imputing"
+  # (estimating lambda)
+  lam = np.vstack([m.train_set.sequential().imputation(),
+                   m.test_set.sequential().imputation()])
+  return st.poisson(mu=lam).logpmf(x).mean()
 
 def pois_llik(lam, train, test):
   if ss.issparse(train):
@@ -90,9 +100,19 @@ def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **
   lam = np.exp(s1 - s + F.T.dot(L))
   return st.poisson(mu=lam).logpmf(test.values).mean()
 
-def generalization_score_plra1(train, test, n_components=10, **kwargs):
-  res = wlra.plra(train.values, rank=n_components, max_iters=50000)
-  return st.poisson(mu=np.exp(res)).logpmf(test.values).mean()
+def generalization_score_scvi(train, test, n_components=10, **kwargs):
+  from scvi.dataset import GeneExpressionDataset
+  from scvi.inference import UnsupervisedTrainer
+  from scvi.models import VAE
+  data = GeneExpressionDataset(*GeneExpressionDataset.get_attributes_from_matrix(train.values))
+  vae = VAE(n_input=train.shape[1])
+  m = UnsupervisedTrainer(vae, data, verbose=False)
+  m.train(n_epochs=100)
+  # Training permuted the data for minibatching. Unpermute before "imputing"
+  # (estimating lambda)
+  lam = np.vstack([m.train_set.sequential().imputation(),
+                   m.test_set.sequential().imputation()])
+  return pois_llik(lam, train, test)
 
 def evaluate_lra_generalization(x, methods, n_trials=1, **kwargs):
   result = collections.defaultdict(list)
