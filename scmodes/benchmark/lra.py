@@ -7,7 +7,7 @@ import rpy2.robjects.pandas2ri
 import scipy.sparse as ss
 import scipy.stats as st
 import scmodes
-import sklearn.decomposition
+import sklearn.decomposition as skd
 import wlra
 
 rpy2.robjects.numpy2ri.activate()
@@ -15,7 +15,7 @@ rpy2.robjects.pandas2ri.activate()
 glmpca = rpy2.robjects.packages.importr('glmpca')
 
 def training_score_nmf(x, n_components=10, **kwargs):
-  m = sklearn.decomposition.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(x)
+  m = skd.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(x)
   return st.poisson(mu=m.transform(x).dot(m.components_)).logpmf(x).mean()
 
 def _glmpca(x, n_components, max_restarts):
@@ -78,7 +78,7 @@ def train_test_split(x, p=0.5):
   return train, test
 
 def generalization_score_nmf(train, test, n_components=10, **kwargs):
-  m = sklearn.decomposition.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(train)
+  m = skd.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(train)
   return pois_llik(m.transform(train).dot(m.components_), train, test)
 
 def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **kwargs):
