@@ -1,5 +1,6 @@
 import scmodes
 import numpy as np
+import pandas as pd
 import pytest
 
 @pytest.fixture
@@ -23,4 +24,4 @@ def simulate_holdout():
 def simulate_train_test():
   x, eta = scmodes.dataset.simulate_pois(n=200, p=300, rank=1, eta_max=3)
   train, test = scmodes.benchmark.train_test_split(x)
-  return train, test, eta
+  return pd.DataFrame(train), pd.DataFrame(test), eta

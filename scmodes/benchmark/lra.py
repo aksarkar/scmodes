@@ -8,7 +8,9 @@ import scipy.sparse as ss
 import scipy.stats as st
 import scmodes
 import sklearn.decomposition as skd
+import torch
 import wlra
+import wlra.vae
 
 rpy2.robjects.numpy2ri.activate()
 rpy2.robjects.pandas2ri.activate()
@@ -47,6 +49,16 @@ def _glmpca(x, n_components, max_restarts):
 def training_score_glmpca(x, n_components=10, max_restarts=1, **kwargs):
   res = _glmpca(x, n_components, max_restarts)
   return res[-1]
+
+def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
+  n, p = x.shape
+  s = x.values.sum(axis=1, keepdims=True)
+  x = torch.tensor(x.values, dtype=torch.float)
+  s = torch.tensor(s, dtype=torch.float)
+  m = (wlra.vae.PVAE(p, n_components)
+       .fit(x, s, lr=lr, max_epochs=max_epochs))
+  lam = m.denoise(x)
+  return st.poisson(mu=lam).logpmf(x).mean()
 
 def training_score_scvi(x, n_components=10, **kwargs):
   from scvi.dataset import GeneExpressionDataset
@@ -102,6 +114,15 @@ def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **
     s = np.log(test.values.mean(axis=1, keepdims=True))
     lam = np.exp(s + F.T.dot(L))
     return st.poisson(mu=lam).logpmf(test.values).mean()
+
+def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
+  n, p = train.shape
+  s = train.values.sum(axis=1, keepdims=True)
+  x = torch.tensor(train.values, dtype=torch.float)
+  s = torch.tensor(s, dtype=torch.float)
+  m = (wlra.vae.PVAE(p, n_components)
+       .fit(x, s, lr=lr, max_epochs=max_epochs))
+  return pois_llik(m.denoise(x), train, test)
 
 def generalization_score_scvi(train, test, n_components=10, **kwargs):
   from scvi.dataset import GeneExpressionDataset

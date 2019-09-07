@@ -12,14 +12,14 @@ def test_training_score_nmf(simulate):
   res = scmodes.benchmark.training_score_nmf(x, n_components=10)
   assert res <= 0
 
-def test_training_score_lda(simulate):
-  x, eta = simulate
-  res = scmodes.benchmark.training_score_lda(x, n_components=10)
-  assert res <= 0
-
 def test_training_score_glmpca(simulate):
   x, eta = simulate
   res = scmodes.benchmark.training_score_glmpca(pd.DataFrame(x), n_components=10)
+  assert res <= 0
+
+def test_training_score_pvae(simulate):
+  x, eta = simulate
+  res = scmodes.benchmark.training_score_pvae(pd.DataFrame(x), n_components=10)
   assert res <= 0
 
 def test_pois_llik(simulate_train_test):
@@ -76,31 +76,21 @@ def test_generalization_score_nmf(simulate_train_test):
   assert np.isfinite(res)
   assert res < 0
 
-def test_generalization_score_nmf_df(simulate):
-  x, eta = simulate
-  x = pd.DataFrame(x)
-  train, test = scmodes.benchmark.train_test_split(x)
-  res = scmodes.benchmark.generalization_score_nmf(train, test, n_components=10)
-  assert np.isfinite(res)
-  assert res < 0
-
-def test_generalization_score_lda(simulate_train_test):
+def test_generalization_score_glmpca(simulate_train_test):
   train, test, eta = simulate_train_test
-  res = scmodes.benchmark.generalization_score_lda(train, test, n_components=10)
+  res = scmodes.benchmark.generalization_score_glmpca(train, test, n_components=10)
   assert np.isfinite(res)
   assert res < 0
 
-def test_generalization_score_glmpca(simulate):
-  x, eta = simulate
-  x = pd.DataFrame(x)
-  train, test = scmodes.benchmark.train_test_split(x)
-  res = scmodes.benchmark.generalization_score_glmpca(train, test, n_components=10)
+def test_generalization_score_pvae(simulate_train_test):
+  train, test, eta = simulate_train_test
+  res = scmodes.benchmark.generalization_score_pvae(train, test, n_components=10)
   assert np.isfinite(res)
   assert res < 0
 
 def test_evaluate_lra_generalization(simulate):
   x, eta = simulate
   x = pd.DataFrame(x)
-  res = scmodes.benchmark.evaluate_lra_generalization(x, methods=['nmf', 'glmpca'])
+  res = scmodes.benchmark.evaluate_lra_generalization(x, methods=['nmf'])
   assert not res.empty
   assert np.isfinite(res.values).all()
