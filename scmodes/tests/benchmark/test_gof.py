@@ -59,3 +59,17 @@ def test_gof_zig(test_data):
   assert res.shape[0] == x.shape[1]
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
+
+def test_gof_unimodal(test_data):
+  x = test_data
+  res = scmodes.benchmark.gof_unimodal(x)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
+def test_gof_npmle(test_data):
+  x = test_data
+  res = scmodes.benchmark.gof_npmle(x)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()

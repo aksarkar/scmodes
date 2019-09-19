@@ -1,3 +1,4 @@
+import functools as ft
 import numpy as np
 import pandas as pd
 import rpy2.robjects.packages
@@ -157,11 +158,57 @@ def gof_zig(x, **kwargs):
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
+def _ash_cdf(x, a):
+  """Wrap around ashr::cdf.ash"""
+  return np.array(ashr.cdf_ash(a, x).rx2('y')).ravel()
+
+def _ash_pmf(x, a):
+  """Compute marginal PMF using ashr::cdf.ash"""
+  Fx = _ash_cdf(x, a)
+  Fx_1 = _ash_cdf(x - 1, a)
+  return Fx - Fx_1
+
 def gof_unimodal(x, **kwargs):
-  raise NotImplementedError
+  result = []
+  size = x.sum(axis=1)
+  for k in x:
+    lam = x[k] / size
+    if np.isclose(lam.min(), lam.max()):
+      # No variation
+      raise RuntimeError
+    res = ashr.ash_workhorse(
+      # these are ignored by ash
+      pd.Series(np.zeros(x[k].shape)),
+      1,
+      outputlevel='fitted_g',
+      # numpy2ri doesn't DTRT, so we need to use pandas
+      lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
+      mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
+      mode=pd.Series([lam.min(), lam.max()]))
+    d, p = gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
+    result.append((k, d, p))
+  return (pd.DataFrame(result)
+          .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
+          .set_index('gene'))
 
 def gof_zief(x, **kwargs):
   raise NotImplementedError
 
-def gof_npmle(x, **kwargs):
-  raise NotImplementedError
+def gof_npmle(x, K=100, **kwargs):
+  result = []
+  size = x.sum(axis=1)
+  for k in x:
+    lam = x[k] / size
+    grid = np.linspace(0, lam.max(), K + 1)
+    res = ashr.ash_workhorse(
+      pd.Series(np.zeros(x.shape[0])),
+      1,
+      outputlevel='fitted_g',
+      lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
+      g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
+    d, p = gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
+    result.append((k, d, p))
+  return (pd.DataFrame(result)
+          .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
+          .set_index('gene'))
+    
