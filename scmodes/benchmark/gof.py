@@ -29,10 +29,10 @@ def gof(x, cdf, pmf, **kwargs):
   """
   F = cdf(x, **kwargs)
   f = pmf(x, **kwargs)
-  q = rpp(F, f)
+  q = _rpp(F, f)
   return st.kstest(q, 'uniform')
 
-def rpp(cdf, pmf):
+def _rpp(cdf, pmf):
   """Return randomized predictive p-values for discrete data x.
 
   Randomized predictive p-values q_i have the property that if x_i ~ F(.), then
@@ -57,7 +57,7 @@ def rpp(cdf, pmf):
   rpp = cdf + u * pmf
   return rpp
 
-def zig_cdf(x, size, log_mu, log_phi, logodds=None):
+def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal CDF of Poisson-(point) Gamma model
 
   x_i ~ Poisson(s_i \lambda_i)
@@ -81,7 +81,7 @@ def zig_cdf(x, size, log_mu, log_phi, logodds=None):
   cdf = np.where(x > 0, pi0 + (1 - pi0) * cdf, cdf)
   return cdf
 
-def zig_pmf(x, size, log_mu, log_phi, logodds=None):
+def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal PMF of Poisson-(point) Gamma model
 
   x_i ~ Poisson(s_i \lambda_i)
@@ -211,4 +211,3 @@ def gof_npmle(x, K=100, **kwargs):
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
-    
