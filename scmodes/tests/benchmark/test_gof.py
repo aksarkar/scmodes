@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 import scipy.stats as st
 import scmodes
+import scmodes.benchmark.gof
 
 @pytest.fixture
 def test_data():
@@ -15,7 +16,7 @@ def test_gof():
   mu = 10
   px = st.poisson(mu=mu)
   x = px.rvs(size=100)
-  d, p = scmodes.benchmark.gof(x, cdf=px.cdf, pmf=px.pmf)
+  d, p = scmodes.benchmark.gof._gof(x, cdf=px.cdf, pmf=px.pmf)
   assert d >= 0
   assert 0 <= p <= 1
 
@@ -32,7 +33,7 @@ def test_rpp():
 def test_gamma_cdf():
   np.random.seed(0)
   x = st.nbinom(n=10, p=.1).rvs(size=100)
-  Fx = scmodes.benchmark.zig_cdf(x, size=1, log_mu=-5, log_phi=-1)
+  Fx = scmodes.benchmark.gof._zig_cdf(x, size=1, log_mu=-5, log_phi=-1)
   assert Fx.shape == x.shape
   assert np.isfinite(Fx).all()
   assert (Fx >= 0).all()
@@ -41,10 +42,22 @@ def test_gamma_cdf():
 def test_zig_cdf():
   np.random.seed(0)
   x = st.nbinom(n=10, p=.1).rvs(size=100)
-  Fx = scmodes.benchmark.zig_cdf(x, size=1, log_mu=-5, log_phi=-1, logodds=-3)
+  Fx = scmodes.benchmark.gof._zig_cdf(x, size=1, log_mu=-5, log_phi=-1, logodds=-3)
   assert Fx.shape == x.shape
   assert (Fx >= 0).all()
   assert (Fx <= 1).all()
+
+def test_zig_pmf_cdf():
+  x = np.arange(50)
+  import scmodes.benchmark.gof
+  size = 1000
+  log_mu=-5
+  log_phi=-1
+  logodds=-1
+  Fx = scmodes.benchmark.gof._zig_cdf(x, size=size, log_mu=log_mu, log_phi=log_phi, logodds=logodds)
+  Fx_1 = scmodes.benchmark.gof._zig_cdf(x - 1, size=size, log_mu=log_mu, log_phi=log_phi, logodds=logodds)
+  fx = scmodes.benchmark.gof._zig_pmf(x, size=size, log_mu=log_mu, log_phi=log_phi, logodds=logodds)
+  assert np.isclose(Fx - Fx_1, fx).all()
 
 def test_gof_gamma(test_data):
   x = test_data

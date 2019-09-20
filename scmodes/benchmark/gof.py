@@ -13,7 +13,7 @@ rpy2.robjects.numpy2ri.activate()
 ashr = rpy2.robjects.packages.importr('ashr')
 descend = rpy2.robjects.packages.importr('descend')
 
-def gof(x, cdf, pmf, **kwargs):
+def _gof(x, cdf, pmf, **kwargs):
   """Test for goodness of fit x_i ~ \hat{F}(.)
 
   If x_i ~ F(.), then F(x_i) ~ Uniform(0, 1). Use randomized predictive
@@ -27,7 +27,7 @@ def gof(x, cdf, pmf, **kwargs):
   kwargs - arguments to cdf, pmf
 
   """
-  F = cdf(x, **kwargs)
+  F = cdf(x - 1, **kwargs)
   f = pmf(x, **kwargs)
   q = _rpp(F, f)
   return st.kstest(q, 'uniform')
@@ -61,7 +61,7 @@ def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal CDF of Poisson-(point) Gamma model
 
   x_i ~ Poisson(s_i \lambda_i)
-  lambda_i ~ pi0 \delta_0(\cdot) + Gamma(1 / \phi, 1 / (\mu\phi))
+  lambda_i ~ \pi_0 \delta_0(\cdot) + (1 - \pi_0) Gamma(1 / \phi, 1 / (\mu\phi))
 
   size - scalar or array-like (n,)
   log_mu - scalar
@@ -72,20 +72,19 @@ def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
   n = np.exp(-log_phi)
   p = 1 / (1 + (size * np.exp(log_mu + log_phi)))
   if logodds is not None:
-    pi0 = sp.expit(-logodds)
+    pi0 = sp.expit(logodds)
   else:
     pi0 = 0
-  cdf = st.nbinom(n=n, p=p).cdf(x - 1)
-  # Important: this excludes the right endpoint, so we need to special case x =
-  # 0
-  cdf = np.where(x > 0, pi0 + (1 - pi0) * cdf, cdf)
+  cdf = st.nbinom(n=n, p=p).cdf(x)
+  # We need to handle x = -1
+  cdf = np.where(x >= 0, pi0 + (1 - pi0) * cdf, cdf)
   return cdf
 
 def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal PMF of Poisson-(point) Gamma model
 
   x_i ~ Poisson(s_i \lambda_i)
-  lambda_i ~ pi0 \delta_0(\cdot) + Gamma(1 / \phi, 1 / (\mu\phi))
+  lambda_i ~ \pi_0 \delta_0(\cdot) + (1 - \pi_0) Gamma(1 / \phi, 1 / (\mu\phi))
 
   size - scalar or array-like (n,)
   log_mu - scalar
@@ -97,7 +96,7 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
   p = 1 / (1 + (size * np.exp(log_mu + log_phi)))
   pmf = st.nbinom(n=n, p=p).pmf(x)
   if logodds is not None:
-    pi0 = sp.expit(-logodds)
+    pi0 = sp.expit(logodds)
     pmf *= (1 - pi0)
     pmf[x == 0] += pi0
   return pmf
@@ -118,7 +117,7 @@ def gof_gamma(x, **kwargs):
   log_phi = pd.DataFrame(log_phi, columns=x.columns)
   result = []
   for k in x:
-    d, p = gof(x[k].values.ravel(), cdf=zig_cdf, pmf=zig_pmf,
+    d, p = _gof(x[k].values.ravel(), cdf=zig_cdf, pmf=zig_pmf,
                size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
                log_phi=log_phi.loc[0,k])
     result.append((k, d, p))
@@ -150,7 +149,7 @@ def gof_zig(x, **kwargs):
   logodds = pd.DataFrame(logodds, columns=x.columns)
   result = []
   for k in x:
-    d, p = gof(x[k].values.ravel(), cdf=zig_cdf, pmf=zig_pmf,
+    d, p = _gof(x[k].values.ravel(), cdf=zig_cdf, pmf=zig_pmf,
                size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
                log_phi=log_phi.loc[0,k], logodds=logodds.loc[0,k])
     result.append((k, d, p))
@@ -185,7 +184,7 @@ def gof_unimodal(x, **kwargs):
       lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
       mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
       mode=pd.Series([lam.min(), lam.max()]))
-    d, p = gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
+    d, p = _gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
     result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
@@ -206,7 +205,7 @@ def gof_npmle(x, K=100, **kwargs):
       outputlevel='fitted_g',
       lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
       g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
-    d, p = gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
+    d, p = _gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
     result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
