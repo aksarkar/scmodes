@@ -212,9 +212,9 @@ def gof_npmle(x, K=100, **kwargs):
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def evaluate_gof(x, pool, methods, **kwargs):
+def evaluate_gof(x, methods, **kwargs):
   result = {}
   for m in methods:
     # Hack: get functions by name
-    result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, pool=pool, **kwargs)
-  return pd.DataFrame.from_dict(result, orient='columns')
+    result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, **kwargs)
+  return pd.concat(result).reset_index().rename({'level_0': 'method'}, axis='columns')

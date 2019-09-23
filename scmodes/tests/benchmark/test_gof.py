@@ -86,3 +86,8 @@ def test_gof_npmle(test_data):
   assert res.shape[0] == x.shape[1]
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
+
+def test_evaluate_gof(test_data):
+  x = test_data
+  res = scmodes.benchmark.evaluate_gof(x, methods=['gamma'])
+  assert res.shape == (x.shape[1], 4)
