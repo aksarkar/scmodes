@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import numpy as np
 import os
 import pandas as pd
@@ -73,9 +74,21 @@ def test_gof_zig(test_data):
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
 
-def test_gof_unimodal(test_data):
+def test__gof_unimodal(test_data):
   x = test_data
-  res = scmodes.benchmark.gof_unimodal(x)
+  gene = 'ENSG00000116251'
+  k, d, p = scmodes.benchmark.gof._gof_unimodal(gene, x, x.sum(axis=1))
+  assert k == gene
+  assert np.isfinite(d)
+  assert d >= 0
+  assert np.isfinite(p)
+  assert 0 <= p <= 1
+
+@pytest.mark.skip('multiprocessing support in pytest')
+def test_gof_unimodal(test_data):
+  with mp.Pool() as pool:
+    x = test_data
+    res = scmodes.benchmark.gof_unimodal(x, pool)
   assert res.shape[0] == x.shape[1]
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()

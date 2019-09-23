@@ -168,25 +168,32 @@ def _ash_pmf(x, a):
   Fx_1 = _ash_cdf(x - 1, a)
   return Fx - Fx_1
 
-def gof_unimodal(x, **kwargs):
+def _gof_unimodal(k, x, size):
+  """Helper function to fit one gene"""
+  lam = x[k] / size
+  if np.isclose(lam.min(), lam.max()):
+    # No variation
+    raise RuntimeError
+  res = ashr.ash_workhorse(
+    # these are ignored by ash
+    pd.Series(np.zeros(x[k].shape)),
+    1,
+    outputlevel='fitted_g',
+    # numpy2ri doesn't DTRT, so we need to use pandas
+    lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
+    mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
+    mode=pd.Series([lam.min(), lam.max()]))
+  d, p = _gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
+  return k, d, p
+
+def gof_unimodal(x, pool, **kwargs):
   result = []
   size = x.sum(axis=1)
-  for k in x:
-    lam = x[k] / size
-    if np.isclose(lam.min(), lam.max()):
-      # No variation
-      raise RuntimeError
-    res = ashr.ash_workhorse(
-      # these are ignored by ash
-      pd.Series(np.zeros(x[k].shape)),
-      1,
-      outputlevel='fitted_g',
-      # numpy2ri doesn't DTRT, so we need to use pandas
-      lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
-      mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
-      mode=pd.Series([lam.min(), lam.max()]))
-    d, p = _gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
-    result.append((k, d, p))
+  f = ft.partial(_gof_unimodal, x=x, size=size)
+  if pool is not None:
+    result = pool.map(f, x)
+  else:
+    result = [f(k) for k in x]
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
@@ -212,9 +219,9 @@ def gof_npmle(x, K=100, **kwargs):
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def evaluate_gof(x, methods, **kwargs):
+def evaluate_gof(x, methods, pool=None, **kwargs):
   result = {}
   for m in methods:
     # Hack: get functions by name
-    result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, **kwargs)
+    result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, pool=pool, **kwargs)
   return pd.concat(result).reset_index().rename({'level_0': 'method'}, axis='columns')
