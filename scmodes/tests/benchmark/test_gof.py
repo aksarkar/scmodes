@@ -11,7 +11,7 @@ def test_data():
   x = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'counts.txt.gz'), sep='\t', index_col=0)
   return x
 
-def test_gof():
+def test__gof():
   np.random.seed(0)
   mu = 10
   px = st.poisson(mu=mu)
@@ -20,14 +20,14 @@ def test_gof():
   assert d >= 0
   assert 0 <= p <= 1
 
-def test_rpp():
+def test__rpp():
   np.random.seed(0)
   mu = 10
   px = st.poisson(mu=mu)
   x = px.rvs(size=100)
   F = px.cdf(x - 1)
   f = px.pmf(x)
-  vals = scmodes.benchmark.rpp(F, f)
+  vals = scmodes.benchmark.gof._rpp(F, f)
   assert vals.shape == x.shape
 
 def test_gamma_cdf():
