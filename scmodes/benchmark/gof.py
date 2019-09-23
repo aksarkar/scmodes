@@ -118,7 +118,7 @@ def gof_gamma(x, **kwargs):
   log_phi = pd.DataFrame(log_phi, columns=x.columns)
   result = []
   for k in x:
-    d, p = _gof(x[k].values.ravel(), cdf=zig_cdf, pmf=zig_pmf,
+    d, p = _gof(x[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
                size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
                log_phi=log_phi.loc[0,k])
     result.append((k, d, p))
@@ -150,7 +150,7 @@ def gof_zig(x, **kwargs):
   logodds = pd.DataFrame(logodds, columns=x.columns)
   result = []
   for k in x:
-    d, p = _gof(x[k].values.ravel(), cdf=zig_cdf, pmf=zig_pmf,
+    d, p = _gof(x[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
                size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
                log_phi=log_phi.loc[0,k], logodds=logodds.loc[0,k])
     result.append((k, d, p))
