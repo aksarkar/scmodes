@@ -34,7 +34,7 @@ def fit_unimodal(x, s, num_points=1000):
     1,
     lik=ashr.lik_pois(y=pd.Series(x), scale=pd.Series(s), link='identity'),
     outputlevel='fitted_g',
-    mixsd=pd.Series(np.geomspace(lam.min() + 1e-4, lam.max(), 25)),
+    mixsd=pd.Series(np.exp(np.arange(np.log(1 / s.mean()), np.log(lam.max()), step=.5 * np.log(2)))),
     mode=pd.Series([lam.min(), lam.max()]))
   F = ashr.cdf_ash(res, grid)
   return [np.array(F.rx2('x')), np.array(F.rx2('y')).ravel()]

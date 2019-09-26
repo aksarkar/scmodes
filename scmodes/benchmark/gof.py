@@ -4,6 +4,7 @@ import pandas as pd
 import rpy2.robjects.packages
 import rpy2.robjects.pandas2ri
 import rpy2.robjects.numpy2ri
+import scipy.integrate as si
 import scipy.stats as st
 import scipy.special as sp
 import sys
@@ -158,42 +159,65 @@ def gof_zig(x, **kwargs):
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def _ash_cdf(x, a):
-  """Wrap around ashr::cdf.ash"""
-  return np.array(ashr.cdf_ash(a, x).rx2('y')).ravel()
+def _ash_cdf(x, fit, s):
+  """Compute marginal CDF of the data"""
+  # Ref: https://lsun.github.io/truncash/diagnostic_plot.html#ash:_normal_likelihood,_uniform_mixture_prior
+  a = np.array(fit.rx2('fitted_g').rx2('a'))
+  b = np.array(fit.rx2('fitted_g').rx2('b'))
+  pi = np.array(fit.rx2('fitted_g').rx2('pi'))
+  N = x.shape[0]
+  K = a.shape[0]
+  F = np.zeros((N, K))
+  for i in range(N):
+    for k in range(K):
+      if x[i] < 0:
+        # Important: we need to handle x = -1
+        F[i,k] = 0
+      elif np.isclose(a[k], b[k]):
+        F[i,k] = st.poisson(mu=s[i] * a[k]).cdf(x[i])
+      else:
+        ak = min(a[k], b[k])
+        bk = max(a[k], b[k])
+        # Marginal PMF involves Gamma CDF. Important: arange excludes endpoint
+        F_gamma = st.gamma(a=np.arange(1, x[i] + 2), scale=1 / s[i]).cdf
+        F[i,k] = (F_gamma(bk) - F_gamma(ak)).sum() / (s[i] * (bk - ak))
+      # Important: floating point addition could lead to F[i,k] > 1, but not
+      # too much larger
+      assert F[i,k] <= 1 or np.isclose(F[i,k], 1)
+  return F.dot(pi)
 
-def _ash_pmf(x, a):
-  """Compute marginal PMF using ashr::cdf.ash"""
-  Fx = _ash_cdf(x, a)
-  Fx_1 = _ash_cdf(x - 1, a)
-  return Fx - Fx_1
+def _ash_pmf(x, fit, **kwargs):
+  """Compute marginal PMF of the data"""
+  # Important: use fit$data, not x
+  return np.array(fit.rx2('fitted_g').rx2('pi')).dot(np.array(ashr.comp_dens_conv(fit.rx2('fitted_g'), fit.rx2('data'))))
 
 def _gof_unimodal(k, x, size):
   """Helper function to fit one gene"""
-  lam = x[k] / size
+  lam = x / size
   if np.isclose(lam.min(), lam.max()):
     # No variation
     raise RuntimeError
   res = ashr.ash_workhorse(
     # these are ignored by ash
-    pd.Series(np.zeros(x[k].shape)),
+    pd.Series(np.zeros(x.shape)),
     1,
-    outputlevel='fitted_g',
+    # Important: we need to access data from inside ash to compute PMF/CDF
+    outputlevel=pd.Series(['fitted_g', 'data']),
     # numpy2ri doesn't DTRT, so we need to use pandas
-    lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
+    lik=ashr.lik_pois(y=x, scale=size, link='identity'),
     mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
     mode=pd.Series([lam.min(), lam.max()]))
-  d, p = _gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
+  d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
   return k, d, p
 
 def gof_unimodal(x, pool, **kwargs):
   result = []
   size = x.sum(axis=1)
-  f = ft.partial(_gof_unimodal, x=x, size=size)
+  f = ft.partial(_gof_unimodal, size=size)
   if pool is not None:
-    result = pool.map(f, x)
+    result = pool.starmap(f, x.iteritems())
   else:
-    result = [f(k) for k in x]
+    result = [f(*args) for args in x.iteritems()]
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
