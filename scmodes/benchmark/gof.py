@@ -103,58 +103,62 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
     pmf[x == 0] += pi0
   return pmf
 
-def gof_gamma(x, **kwargs):
+def gof_gamma(x, chunksize=1000, **kwargs):
   import scqtl
   onehot = np.ones((x.shape[0], 1))
   size_factor = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
-  log_mu, log_phi, *_ = scqtl.tf.fit(
-    umi=x.values.astype(np.float32),
-    onehot=onehot.astype(np.float32),
-    design=design.astype(np.float32),
-    size_factor=size_factor.astype(np.float32),
-    learning_rate=1e-3,
-    max_epochs=30000)
-  log_mu = pd.DataFrame(log_mu, columns=x.columns)
-  log_phi = pd.DataFrame(log_phi, columns=x.columns)
-  result = []
-  for k in x:
-    d, p = _gof(x[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-               size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
-               log_phi=log_phi.loc[0,k])
-    result.append((k, d, p))
+  for i in range(int(np.ceil(x.shape[1] / chunksize))):
+    chunk = x.iloc[:,chunksize * i:chunksize * (i + 1)]
+    log_mu, log_phi, *_ = scqtl.tf.fit(
+      umi=chunk.values.astype(np.float32),
+      onehot=onehot.astype(np.float32),
+      design=design.astype(np.float32),
+      size_factor=size_factor.astype(np.float32),
+      learning_rate=1e-3,
+      max_epochs=30000)
+    log_mu = pd.DataFrame(log_mu, columns=x.columns)
+    log_phi = pd.DataFrame(log_phi, columns=x.columns)
+    result = []
+    for k in x:
+      d, p = _gof(x[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
+                 size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
+                 log_phi=log_phi.loc[0,k])
+      result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def gof_zig(x, **kwargs):
+def gof_zig(x, chunksize=1000, **kwargs):
   import scqtl
   onehot = np.ones((x.shape[0], 1))
   size_factor = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
-  init = scqtl.tf.fit(
-    umi=x.values.astype(np.float32),
-    onehot=onehot.astype(np.float32),
-    design=design.astype(np.float32),
-    size_factor=size_factor.astype(np.float32),
-    learning_rate=1e-3,
-    max_epochs=30000)
-  log_mu, log_phi, logodds, *_ = scqtl.tf.fit(
-    umi=x.astype(np.float32),
-    onehot=onehot.astype(np.float32),
-    size_factor=size_factor.astype(np.float32),
-    learning_rate=1e-3,
-    max_epochs=30000,
-    warm_start=init[:3])
-  log_mu = pd.DataFrame(log_mu, columns=x.columns)
-  log_phi = pd.DataFrame(log_phi, columns=x.columns)
-  logodds = pd.DataFrame(logodds, columns=x.columns)
-  result = []
-  for k in x:
-    d, p = _gof(x[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-               size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
-               log_phi=log_phi.loc[0,k], logodds=logodds.loc[0,k])
-    result.append((k, d, p))
+  for i in range(int(np.ceil(x.shape[1] / chunksize))):
+    chunk = x.iloc[:,chunksize * i:chunksize * (i + 1)]
+    init = scqtl.tf.fit(
+      umi=chunk.values.astype(np.float32),
+      onehot=onehot.astype(np.float32),
+      design=design.astype(np.float32),
+      size_factor=size_factor.astype(np.float32),
+      learning_rate=1e-3,
+      max_epochs=30000)
+    log_mu, log_phi, logodds, *_ = scqtl.tf.fit(
+      umi=chunk.astype(np.float32),
+      onehot=onehot.astype(np.float32),
+      size_factor=size_factor.astype(np.float32),
+      learning_rate=1e-3,
+      max_epochs=30000,
+      warm_start=init[:3])
+    log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
+    log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
+    logodds = pd.DataFrame(logodds, columns=chunk.columns)
+    result = []
+    for k in chunk:
+      d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
+                 size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
+                 log_phi=log_phi.loc[0,k], logodds=logodds.loc[0,k])
+      result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
@@ -205,12 +209,15 @@ def _gof_unimodal(k, x, size):
     outputlevel=pd.Series(['fitted_g', 'data']),
     # numpy2ri doesn't DTRT, so we need to use pandas
     lik=ashr.lik_pois(y=x, scale=size, link='identity'),
-    mixsd=pd.Series(np.geomspace(lam.min() + 1e-8, lam.max(), 25)),
+    # Important: we need to deal with asymmetric distributions
+    mixcompdist='halfuniform',
+    # Important: the grid cannot be too dense
+    mixsd=pd.Series(np.exp(np.arange(np.log(1 / size.mean()), np.log((x / size).max()), step=.5 * np.log(2)))),
     mode=pd.Series([lam.min(), lam.max()]))
   d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
   return k, d, p
 
-def gof_unimodal(x, pool, **kwargs):
+def gof_unimodal(x, pool=None, **kwargs):
   result = []
   size = x.sum(axis=1)
   f = ft.partial(_gof_unimodal, size=size)
@@ -218,27 +225,6 @@ def gof_unimodal(x, pool, **kwargs):
     result = pool.starmap(f, x.iteritems())
   else:
     result = [f(*args) for args in x.iteritems()]
-  return (pd.DataFrame(result)
-          .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
-          .set_index('gene'))
-
-def gof_zief(x, **kwargs):
-  raise NotImplementedError
-
-def gof_npmle(x, K=100, **kwargs):
-  result = []
-  size = x.sum(axis=1)
-  for k in x:
-    lam = x[k] / size
-    grid = np.linspace(0, lam.max(), K + 1)
-    res = ashr.ash_workhorse(
-      pd.Series(np.zeros(x.shape[0])),
-      1,
-      outputlevel='fitted_g',
-      lik=ashr.lik_pois(y=x[k], scale=size, link='identity'),
-      g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
-    d, p = _gof(x[k].values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, a=res)
-    result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
