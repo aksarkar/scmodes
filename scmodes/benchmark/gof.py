@@ -229,9 +229,9 @@ def gof_unimodal(x, pool=None, **kwargs):
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def evaluate_gof(x, methods, pool=None, **kwargs):
+def evaluate_gof(x, methods, **kwargs):
   result = {}
   for m in methods:
     # Hack: get functions by name
-    result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, pool=pool, **kwargs)
+    result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, **kwargs)
   return pd.concat(result).reset_index().rename({'level_0': 'method'}, axis='columns')
