@@ -200,21 +200,23 @@ def _gof_unimodal(k, x, size):
   lam = x / size
   if np.isclose(lam.min(), lam.max()):
     # No variation
-    raise RuntimeError
-  res = ashr.ash_workhorse(
-    # these are ignored by ash
-    pd.Series(np.zeros(x.shape)),
-    1,
-    # Important: we need to access data from inside ash to compute PMF/CDF
-    outputlevel=pd.Series(['fitted_g', 'data']),
-    # numpy2ri doesn't DTRT, so we need to use pandas
-    lik=ashr.lik_pois(y=x, scale=size, link='identity'),
-    # Important: we need to deal with asymmetric distributions
-    mixcompdist='halfuniform',
-    # Important: the grid cannot be too dense
-    mixsd=pd.Series(np.exp(np.arange(np.log(1 / size.mean()), np.log((x / size).max()), step=.5 * np.log(2)))),
-    mode=pd.Series([lam.min(), lam.max()]))
-  d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
+    res = st.poisson(mu=size * (x.sum() / size.sum()))
+    d, p = _gof(x.values.ravel(), cdf=res.cdf, pmf=res.pmf)
+  else:
+    res = ashr.ash_workhorse(
+      # these are ignored by ash
+      pd.Series(np.zeros(x.shape)),
+      1,
+      # Important: we need to access data from inside ash to compute PMF/CDF
+      outputlevel=pd.Series(['fitted_g', 'data']),
+      # numpy2ri doesn't DTRT, so we need to use pandas
+      lik=ashr.lik_pois(y=x, scale=size, link='identity'),
+      # Important: we need to deal with asymmetric distributions
+      mixcompdist='halfuniform',
+      # Important: the grid cannot be too dense
+      mixsd=pd.Series(np.exp(np.arange(np.log(1 / size.mean()), np.log((x / size).max()), step=.5 * np.log(2)))),
+      mode=pd.Series([lam.min(), lam.max()]))
+    d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
   return k, d, p
 
 def gof_unimodal(x, pool=None, **kwargs):
