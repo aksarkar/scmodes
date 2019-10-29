@@ -117,11 +117,11 @@ def gof_gamma(x, chunksize=1000, **kwargs):
       size_factor=size_factor.astype(np.float32),
       learning_rate=1e-3,
       max_epochs=30000)
-    log_mu = pd.DataFrame(log_mu, columns=x.columns)
-    log_phi = pd.DataFrame(log_phi, columns=x.columns)
+    log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
+    log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
     result = []
-    for k in x:
-      d, p = _gof(x[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
+    for k in chunk:
+      d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
                  size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
                  log_phi=log_phi.loc[0,k])
       result.append((k, d, p))
