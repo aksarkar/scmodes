@@ -44,7 +44,7 @@ def ipsc(prefix, return_df=False, query=None, n=None, seed=0):
   if query is not None:
     keep_genes = keep_genes[keep_genes.index.isin(query)]
   if n is not None:
-    keep_genes = keep_genes.sample(n=n, random_state=seed)
+    keep_genes = keep_genes[keep_genes.values].sample(n=n, random_state=seed)
   annotations = annotations.loc[keep_samples.values.ravel()]
   result = []
   for chunk in pd.read_csv(f'{prefix}/scqtl-counts.txt.gz', sep='\t', index_col=0, chunksize=100):
