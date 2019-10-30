@@ -27,15 +27,28 @@ def simulate_pois_size(n, p, rank, s, seed=0):
   x = np.random.poisson(lam=s * mu)
   return x, mu
 
-def read_10x(prefix, min_detect=0.25, return_df=False):
+def read_10x(prefix, min_detect=0.25, p=None, return_df=False, seed=0):
   counts = scipy.io.mmread(f'{prefix}/matrix.mtx.gz').tocsr()
-  keep = ((counts > 0).mean(axis=1) >= min_detect).A.ravel()
-  counts = counts[keep].T.A.astype(np.int)
-  if return_df:
-    genes = pd.read_csv(f'{prefix}/genes.tsv.gz', sep='\t', header=None)
-    return pd.DataFrame(counts, columns=genes.loc[keep, 0])
+  samples = pd.read_csv(f'{prefix}/barcodes.tsv.gz', sep='\t', header=None)
+  genes = pd.read_csv(f'{prefix}/genes.tsv.gz', sep='\t', header=None)
+  # Important: counts is genes x samples
+  if min_detect >= 0:
+    keep_genes = ((counts > 0).mean(axis=1) >= min_detect).A.ravel()
+    counts = counts[keep_genes].A.astype(np.int)
+    genes = genes.loc[keep_genes]
   else:
-    return counts
+    raise ValueError('min_detect must be >= 0')
+  if p is not None:
+    if p <= 0:
+      raise ValueError('p must be > 0')
+    np.random.seed(seed)
+    keep_genes = np.random.choice(counts.shape[0], p, replace=False)
+    counts = counts[keep_genes]
+    genes = genes.iloc[keep_genes]
+  if return_df:
+    return pd.DataFrame(counts.T, index=samples[0], columns=genes[0])
+  else:
+    return counts.T
 
 def ipsc(prefix, return_df=False, query=None, n=None, seed=0):
   annotations = pd.read_csv(f'{prefix}/scqtl-annotation.txt', sep='\t')
