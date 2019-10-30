@@ -108,6 +108,7 @@ def gof_gamma(x, chunksize=1000, **kwargs):
   onehot = np.ones((x.shape[0], 1))
   size_factor = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
+  result = []
   for i in range(int(np.ceil(x.shape[1] / chunksize))):
     chunk = x.iloc[:,chunksize * i:chunksize * (i + 1)]
     log_mu, log_phi, *_ = scqtl.tf.fit(
@@ -119,7 +120,6 @@ def gof_gamma(x, chunksize=1000, **kwargs):
       max_epochs=30000)
     log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
     log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
-    result = []
     for k in chunk:
       d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
                  size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
@@ -134,6 +134,7 @@ def gof_zig(x, chunksize=1000, **kwargs):
   onehot = np.ones((x.shape[0], 1))
   size_factor = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
+  result = []
   for i in range(int(np.ceil(x.shape[1] / chunksize))):
     chunk = x.iloc[:,chunksize * i:chunksize * (i + 1)]
     init = scqtl.tf.fit(
@@ -144,7 +145,7 @@ def gof_zig(x, chunksize=1000, **kwargs):
       learning_rate=1e-3,
       max_epochs=30000)
     log_mu, log_phi, logodds, *_ = scqtl.tf.fit(
-      umi=chunk.astype(np.float32),
+      umi=chunk.values.astype(np.float32),
       onehot=onehot.astype(np.float32),
       size_factor=size_factor.astype(np.float32),
       learning_rate=1e-3,
@@ -153,7 +154,6 @@ def gof_zig(x, chunksize=1000, **kwargs):
     log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
     log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
     logodds = pd.DataFrame(logodds, columns=chunk.columns)
-    result = []
     for k in chunk:
       d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
                  size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
