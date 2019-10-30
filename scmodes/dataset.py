@@ -50,14 +50,14 @@ def read_10x(prefix, min_detect=0.25, p=None, return_df=False, seed=0):
   else:
     return counts.T
 
-def ipsc(prefix, return_df=False, query=None, n=None, seed=0):
+def ipsc(prefix, return_df=False, query=None, p=None, seed=0):
   annotations = pd.read_csv(f'{prefix}/scqtl-annotation.txt', sep='\t')
   keep_samples = pd.read_csv(f'{prefix}/quality-single-cells.txt', sep='\t', index_col=0, header=None)
   keep_genes = pd.read_csv(f'{prefix}/genes-pass-filter.txt', sep='\t', index_col=0, header=None)
   if query is not None:
     keep_genes = keep_genes[keep_genes.index.isin(query)]
-  if n is not None:
-    keep_genes = keep_genes[keep_genes.values].sample(n=n, random_state=seed)
+  if p is not None:
+    keep_genes = keep_genes[keep_genes.values].sample(n=p, random_state=seed)
   annotations = annotations.loc[keep_samples.values.ravel()]
   result = []
   for chunk in pd.read_csv(f'{prefix}/scqtl-counts.txt.gz', sep='\t', index_col=0, chunksize=100):
