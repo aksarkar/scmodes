@@ -104,7 +104,7 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
   return pmf
 
 def gof_gamma(x, chunksize=1000, **kwargs):
-  import scqtl
+  import scqtl.tf
   onehot = np.ones((x.shape[0], 1))
   size_factor = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
@@ -130,7 +130,7 @@ def gof_gamma(x, chunksize=1000, **kwargs):
           .set_index('gene'))
 
 def gof_zig(x, chunksize=1000, **kwargs):
-  import scqtl
+  import scqtl.tf
   onehot = np.ones((x.shape[0], 1))
   size_factor = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))

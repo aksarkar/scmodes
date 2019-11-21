@@ -66,6 +66,7 @@ def test_zig_pmf_cdf():
   assert np.isclose(Fx - Fx_1, fx).all()
 
 def test_gof_gamma(test_data):
+  pytest.importorskip('tensorflow')
   x = test_data
   res = scmodes.benchmark.gof_gamma(x)
   assert res.shape[0] == x.shape[1]
@@ -73,6 +74,7 @@ def test_gof_gamma(test_data):
   assert np.isfinite(res['p']).all()
 
 def test_gof_gamma_chunksize(test_data):
+  pytest.importorskip('tensorflow')
   x = test_data
   res = scmodes.benchmark.gof_gamma(x, chunksize=1)
   assert res.shape[0] == x.shape[1]
@@ -80,6 +82,7 @@ def test_gof_gamma_chunksize(test_data):
   assert np.isfinite(res['p']).all()
 
 def test_gof_zig(test_data):
+  pytest.importorskip('tensorflow')
   x = test_data
   res = scmodes.benchmark.gof_zig(x)
   assert res.shape[0] == x.shape[1]
@@ -165,6 +168,7 @@ def test_gof_unimodal(test_data):
   assert np.isfinite(res['p']).all()
 
 def test_evaluate_gof(test_data):
+  pytest.importorskip('tensorflow')
   x = test_data
   res = scmodes.benchmark.evaluate_gof(x, methods=['gamma'])
   assert res.shape == (x.shape[1], 4)
