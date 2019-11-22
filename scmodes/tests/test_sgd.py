@@ -36,7 +36,7 @@ def test_PoissonGamma():
   assert log_phi.shape == (1, p)
 
 def test_PoissonGamma_fit(simulate_gamma):
-  x, s, log_mu, log_phi, oracle_llik = simulate_gamma
+  x, s, log_mu, log_phi, l0 = simulate_gamma
   n, p = x.shape
   D = torch.utils.data
   # Important: data must be float
@@ -49,5 +49,5 @@ def test_PoissonGamma_fit(simulate_gamma):
   log_mu_hat, log_phi_hat = m.opt()
   assert log_mu_hat.shape == (1, p)
   assert log_phi_hat.shape == (1, p)
-  llik = st.nbinom(n=np.exp(-log_phi_hat), p=1 / (1 + s.dot(np.exp(log_mu_hat + log_phi_hat)))).logpmf(x).sum()
-  assert llik > oracle_llik
+  l1 = st.nbinom(n=np.exp(-log_phi_hat), p=1 / (1 + s.dot(np.exp(log_mu_hat + log_phi_hat)))).logpmf(x).sum()
+  assert l1 > l0
