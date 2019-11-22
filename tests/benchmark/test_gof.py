@@ -73,6 +73,15 @@ def test_gof_gamma(test_data):
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
 
+def test_gof_gamma_size(test_data):
+  pytest.importorskip('tensorflow')
+  x = test_data
+  s = np.median(x, axis=1)
+  res = scmodes.benchmark.gof_gamma(x, s=s)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
 def test_gof_gamma_chunksize(test_data):
   pytest.importorskip('tensorflow')
   x = test_data
@@ -85,6 +94,15 @@ def test_gof_zig(test_data):
   pytest.importorskip('tensorflow')
   x = test_data
   res = scmodes.benchmark.gof_zig(x)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
+def test_gof_zig_size(test_data):
+  pytest.importorskip('tensorflow')
+  x = test_data
+  s = np.median(x, axis=1)
+  res = scmodes.benchmark.gof_zig(x, s=s)
   assert res.shape[0] == x.shape[1]
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
@@ -163,6 +181,14 @@ def test__gof_unimodal(test_data):
 def test_gof_unimodal(test_data):
   x = test_data
   res = scmodes.benchmark.gof_unimodal(x)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
+def test_gof_unimodal_size(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  res = scmodes.benchmark.gof_unimodal(x, s=s)
   assert res.shape[0] == x.shape[1]
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()

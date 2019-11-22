@@ -103,10 +103,11 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
     pmf[x == 0] += pi0
   return pmf
 
-def gof_gamma(x, chunksize=1000, **kwargs):
+def gof_gamma(x, s=None, chunksize=1000, **kwargs):
   import scqtl.tf
   onehot = np.ones((x.shape[0], 1))
-  size_factor = x.sum(axis=1).values.reshape(-1, 1)
+  if s is None:
+    s = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
   result = []
   for i in range(int(np.ceil(x.shape[1] / chunksize))):
@@ -115,24 +116,25 @@ def gof_gamma(x, chunksize=1000, **kwargs):
       umi=chunk.values.astype(np.float32),
       onehot=onehot.astype(np.float32),
       design=design.astype(np.float32),
-      size_factor=size_factor.astype(np.float32),
+      size_factor=s.astype(np.float32),
       learning_rate=1e-3,
       max_epochs=30000)
     log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
     log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
     for k in chunk:
       d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-                 size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
+                 size=s.ravel(), log_mu=log_mu.loc[0,k],
                  log_phi=log_phi.loc[0,k])
       result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def gof_zig(x, chunksize=1000, **kwargs):
+def gof_zig(x, s=None, chunksize=1000, **kwargs):
   import scqtl.tf
   onehot = np.ones((x.shape[0], 1))
-  size_factor = x.sum(axis=1).values.reshape(-1, 1)
+  if s is None:
+    s = x.sum(axis=1).values.reshape(-1, 1)
   design = np.zeros((x.shape[0], 1))
   result = []
   for i in range(int(np.ceil(x.shape[1] / chunksize))):
@@ -141,13 +143,13 @@ def gof_zig(x, chunksize=1000, **kwargs):
       umi=chunk.values.astype(np.float32),
       onehot=onehot.astype(np.float32),
       design=design.astype(np.float32),
-      size_factor=size_factor.astype(np.float32),
+      size_factor=s.astype(np.float32),
       learning_rate=1e-3,
       max_epochs=30000)
     log_mu, log_phi, logodds, *_ = scqtl.tf.fit(
       umi=chunk.values.astype(np.float32),
       onehot=onehot.astype(np.float32),
-      size_factor=size_factor.astype(np.float32),
+      size_factor=s.astype(np.float32),
       learning_rate=1e-3,
       max_epochs=30000,
       warm_start=init[:3])
@@ -156,7 +158,7 @@ def gof_zig(x, chunksize=1000, **kwargs):
     logodds = pd.DataFrame(logodds, columns=chunk.columns)
     for k in chunk:
       d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-                 size=size_factor.ravel(), log_mu=log_mu.loc[0,k],
+                 size=s.ravel(), log_mu=log_mu.loc[0,k],
                  log_phi=log_phi.loc[0,k], logodds=logodds.loc[0,k])
       result.append((k, d, p))
   return (pd.DataFrame(result)
@@ -209,10 +211,14 @@ def _gof_unimodal(k, x, size):
     d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
   return k, d, p
 
-def gof_unimodal(x, pool=None, **kwargs):
+def gof_unimodal(x, s=None, pool=None, **kwargs):
   result = []
-  size = x.sum(axis=1)
-  f = ft.partial(_gof_unimodal, size=size)
+  if s is None:
+    s = x.sum(axis=1)
+  else:
+    # Important: data must be coerced to Series to pass through rpy2
+    s = pd.Series(s)
+  f = ft.partial(_gof_unimodal, size=s)
   if pool is not None:
     result = pool.starmap(f, x.iteritems())
   else:
