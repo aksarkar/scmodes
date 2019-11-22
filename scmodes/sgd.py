@@ -28,20 +28,10 @@ def _nb_llik(x, s, log_mean, log_inv_disp):
           - torch.lgamma(inv_disp)
           - torch.lgamma(x + 1))
 
-class PoissonGamma(torch.nn.Module):
+class PoissonGamma():
   def __init__(self, p):
-    super().__init__()
-    self.log_mean = torch.zeros([1, p], requires_grad=True)
-    self.log_inv_disp = torch.zeros([1, p], requires_grad=True)
-
-  def forward(self, x, s):
-    """Return negative log likelihood of the data
-
-    x_i ~ Poisson(s_i lambda_i)
-    lambda_i ~ g = Gamma(exp(log_inv_disp), exp(log_mean - log_inv_disp))
-
-    """
-    return -_nb_llik(x, s, self.log_mean, self.log_inv_disp).sum()
+    self.log_mean = torch.zeros([1, p], dtype=torch.double, requires_grad=True)
+    self.log_inv_disp = torch.zeros([1, p], dtype=torch.double, requires_grad=True)
 
   def fit(self, data, max_epochs=10, verbose=False, **kwargs):
     """Fit the model.
@@ -61,7 +51,7 @@ class PoissonGamma(torch.nn.Module):
           # Move the data to the GPU
           x.cuda()
           s.cuda()
-        loss = self.forward(x, s)
+        loss = -_nb_llik(x, s, self.log_mean, self.log_inv_disp).sum()
         loss.backward()
         opt.step()
       if verbose:
