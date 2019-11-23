@@ -30,10 +30,11 @@ def _nb_llik(x, s, log_mean, log_inv_disp):
 
 class PoissonGamma():
   def __init__(self, p):
-    self.log_mean = torch.zeros([1, p], dtype=torch.double, requires_grad=True)
-    self.log_inv_disp = torch.zeros([1, p], dtype=torch.double, requires_grad=True)
+    self.log_mean = torch.zeros([1, p], dtype=torch.float, requires_grad=True)
+    self.log_inv_disp = torch.zeros([1, p], dtype=torch.float, requires_grad=True)
+    self.trace = []
 
-  def fit(self, data, max_epochs=10, verbose=False, **kwargs):
+  def fit(self, data, max_epochs=10, verbose=False, trace=False, **kwargs):
     """Fit the model.
 
     data - torch.utils.data.DataLoader
@@ -54,8 +55,10 @@ class PoissonGamma():
         loss = -_nb_llik(x, s, self.log_mean, self.log_inv_disp).sum()
         loss.backward()
         opt.step()
+        if trace:
+          self.trace.append([self.log_mean.item(), self.log_inv_disp.item(), loss.item()])
       if verbose:
-        print(loss)
+        print(f'Epoch {epoch}:', loss.item())
 
   @torch.no_grad()
   def opt(self):
