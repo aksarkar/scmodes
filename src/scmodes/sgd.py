@@ -11,7 +11,7 @@ marginal likelihood is analytic.
 """
 import scipy.sparse as ss
 import torch
-import torch.util.data as td
+import torch.utils.data as td
 
 def _nb_llik(x, s, log_mean, log_inv_disp):
   """Return ln p(x_i | s_i, g)
