@@ -98,7 +98,7 @@ def _sgd(x, s, llik, params, lr=1e-2, batch_size=100, max_epochs=100, verbose=Fa
     for p in params:
       p.cuda()
   opt = torch.optim.RMSprop(params, lr=lr)
-  trace = []
+  param_trace = []
   loss = None
   for epoch in range(max_epochs):
     for (x, s) in data:
@@ -114,10 +114,14 @@ def _sgd(x, s, llik, params, lr=1e-2, batch_size=100, max_epochs=100, verbose=Fa
       opt.step()
       if trace:
         # Important: this only works for scalar params
-        trace.append([p.item() for p in params] + [loss.item()])
+        param_trace.append([p.item() for p in params] + [loss.item()])
     if verbose:
       print(f'Epoch {epoch}:', loss.item())
-  return [p.detach().numpy() for p in params] + [loss.item()]
+  result = [p.detach().numpy() for p in params]
+  result.append(loss.item())
+  if trace:
+    result.append(param_trace)
+  return result
 
 def ebpm_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
