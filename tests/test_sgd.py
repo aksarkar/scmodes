@@ -39,75 +39,42 @@ def test__zinb_llik(simulate_gamma):
 
 def test__zinb_llik_zinb_data(simulate_gamma):
   x, s, log_mu, log_phi, _ = simulate_gamma
+  n, p = x.shape
   logodds = np.random.uniform(-3, -1, size=(1, p))
   pi0 = sp.expit(logodds)
   z = np.random.uniform(size=x.shape) < pi0
   y = np.where(z, 0, x)
-  oracle_llik_nonzero = (1 - pi0) * st.nbinom(n=np.exp(-log_phi), p=1 / (1 + s.dot(np.exp(log_mu + log_phi)))).logpmf(y)
-  oracle_llik = np.where(z, pi0 + oracle_llik_nonzero, oracle_llik_nonzero)
-  llik = scmodes.sgd._zinb_llik(torch.tensor(x, dtype=torch.float),
+  oracle_llik_nonzero = np.log(1 - pi0) + st.nbinom(n=np.exp(-log_phi), p=1 / (1 + s.dot(np.exp(log_mu + log_phi)))).logpmf(y)
+  oracle_llik = np.where(y < 1, np.log(pi0 + np.exp(oracle_llik_nonzero)), oracle_llik_nonzero).sum()
+  llik = scmodes.sgd._zinb_llik(torch.tensor(y, dtype=torch.float),
                                 torch.tensor(s, dtype=torch.float),
                                 torch.tensor(log_mu, dtype=torch.float),
                                 torch.tensor(-log_phi, dtype=torch.float),
                                 torch.tensor(logodds, dtype=torch.float)).sum()
   assert np.isclose(llik, oracle_llik)
 
-# def test_PoissonGamma():
-#   p = 10
-#   m = scmodes.sgd.PoissonGamma(p)
-#   log_mu, log_phi = m.opt()
-#   assert log_mu.shape == (1, p)
-#   assert log_phi.shape == (1, p)
+def test_ebpm_gamma_batch(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  log_mu_hat, neg_log_phi_hat, l1 = scmodes.sgd.ebpm_gamma(x, s, batch_size=n, max_epochs=2000)
+  assert log_mu_hat.shape == (1, p)
+  assert neg_log_phi_hat.shape == (1, p)
+  assert l1 > l0
 
-# def test_PoissonGamma_batch(simulate_gamma):
-#   x, s, log_mu, log_phi, l0 = simulate_gamma
-#   n, p = x.shape
-#   D = torch.utils.data
-#   # Important: data must be float
-#   loader = D.DataLoader(
-#     D.TensorDataset(torch.tensor(x, dtype=torch.float), torch.tensor(s, dtype=torch.float)),
-#     batch_size=n, pin_memory=True)
-#   m = scmodes.sgd.PoissonGamma(p)
-#   m.fit(loader, max_epochs=2000)
+def test_ebpm_gamma_minibatch(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  log_mu_hat, neg_log_phi_hat, l1 = scmodes.sgd.ebpm_gamma(x, s, batch_size=100, max_epochs=100)
+  assert log_mu_hat.shape == (1, p)
+  assert neg_log_phi_hat.shape == (1, p)
+  assert l1 > l0
 
-#   log_mu_hat, log_phi_hat = m.opt()
-#   assert log_mu_hat.shape == (1, p)
-#   assert log_phi_hat.shape == (1, p)
-#   l1 = st.nbinom(n=np.exp(-log_phi_hat), p=1 / (1 + s.dot(np.exp(log_mu_hat + log_phi_hat)))).logpmf(x).sum()
-#   assert l1 > l0
-
-# def test_PoissonGamma_minibatch(simulate_gamma):
-#   x, s, log_mu, log_phi, l0 = simulate_gamma
-#   n, p = x.shape
-#   D = torch.utils.data
-#   # Important: data must be float
-#   loader = D.DataLoader(
-#     D.TensorDataset(torch.tensor(x, dtype=torch.float), torch.tensor(s, dtype=torch.float)),
-#     batch_size=100, pin_memory=True)
-#   m = scmodes.sgd.PoissonGamma(p)
-#   m.fit(loader, max_epochs=500)
-
-#   log_mu_hat, log_phi_hat = m.opt()
-#   assert log_mu_hat.shape == (1, p)
-#   assert log_phi_hat.shape == (1, p)
-#   l1 = st.nbinom(n=np.exp(-log_phi_hat), p=1 / (1 + s.dot(np.exp(log_mu_hat + log_phi_hat)))).logpmf(x).sum()
-#   assert l1 > l0
-
-# def test_PoissonGamma_sgd(simulate_gamma):
-#   x, s, log_mu, log_phi, l0 = simulate_gamma
-#   n, p = x.shape
-#   D = torch.utils.data
-#   # Important: data must be float
-#   loader = D.DataLoader(
-#     D.TensorDataset(torch.tensor(x, dtype=torch.float), torch.tensor(s, dtype=torch.float)),
-#     batch_size=1, pin_memory=True)
-#   m = scmodes.sgd.PoissonGamma(p)
-#   # Important: learning rate has to lowered to compensate for increased
-#   # variance in gradient estimator
-#   m.fit(loader, max_epochs=10, lr=5e-3)
-
-#   log_mu_hat, log_phi_hat = m.opt()
-#   assert log_mu_hat.shape == (1, p)
-#   assert log_phi_hat.shape == (1, p)
-#   l1 = st.nbinom(n=np.exp(-log_phi_hat), p=1 / (1 + s.dot(np.exp(log_mu_hat + log_phi_hat)))).logpmf(x).sum()
-#   assert l1 > l0
+def test_ebpm_gamma_sgd(simulate_gamma):
+  x, s, log_mu, log_phi, l0 = simulate_gamma
+  n, p = x.shape
+  # Important: learning rate has to lowered to compensate for increased
+  # variance in gradient estimator
+  log_mu_hat, neg_log_phi_hat, l1 = scmodes.sgd.ebpm_gamma(x, s, batch_size=1, max_epochs=10, lr=5e-3)
+  assert log_mu_hat.shape == (1, p)
+  assert neg_log_phi_hat.shape == (1, p)
+  assert l1 > l0

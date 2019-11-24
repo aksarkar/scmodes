@@ -49,8 +49,9 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
 
   """
   nb_llik = _nb_llik(x, s, log_mean, log_inv_disp)
-  case_zero = -torch.nn.softplus(-logodds) + torch.nn.softplus(nb_llik - logodds)
-  case_non_zero = -torch.nn.softplus(logodds) + nb_llik
+  softplus = torch.nn.functional.softplus
+  case_zero = -softplus(-logodds) + softplus(nb_llik - logodds)
+  case_non_zero = -softplus(logodds) + nb_llik
   return torch.where(torch.lt(x, 1), case_zero, case_non_zero)
 
 def _check_args(x, s, init, lr, batch_size, max_epochs):
@@ -92,32 +93,37 @@ def _sgd(x, s, llik, params, lr=1e-2, batch_size=100, max_epochs=100, verbose=Fa
   params - list of tensor [1, p]
 
   """
-  data = td.DataLoader(td.TensorDataset(x, s, batch_size=batch_size, pin_memory=True))
+  data = td.DataLoader(td.TensorDataset(x, s), batch_size=batch_size, pin_memory=True)
   if torch.cuda.is_available():
     for p in params:
       p.cuda()
   opt = torch.optim.RMSprop(params, lr=lr)
   trace = []
+  loss = None
   for epoch in range(max_epochs):
     for (x, s) in data:
       opt.zero_grad()
       if torch.cuda.is_available():
         x.cuda()
         s.cuda()
-      loss = -llik(x, s, log_mean, log_inv_disp).sum()
+      # Important: params are assumed to be provided in the order assumed by llik
+      loss = -llik(x, s, *params).sum()
       if torch.isnan(loss):
         raise RuntimeError('nan loss')
       loss.backward()
       opt.step()
       if trace:
+        # Important: this only works for scalar params
         trace.append([p.item() for p in params] + [loss.item()])
     if verbose:
       print(f'Epoch {epoch}:', loss.item())
-  return [p.item() for p in params] + [loss.item()]
+  return [p.detach().numpy() for p in params] + [loss.item()]
 
 def ebpm_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
+
+  Important: returns log mu and -log phi
 
   x - array-like [n, p]
   s - array-like [n, 1]
@@ -133,11 +139,14 @@ distribution
     log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True)
     log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True)
   return _sgd(x, s, llik=_nb_llik, params=[log_mean, log_inv_disp], lr=lr,
-              batch_size=batch_size, verbose=verbose, trace=trace)
+              batch_size=batch_size, max_epochs=max_epochs, verbose=verbose,
+              trace=trace)
 
 def ebpm_point_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
+
+  Important: returns log mu, -log phi, logit pi
 
   x - array-like [n, p]
   s - array-like [n, 1]
@@ -155,4 +164,5 @@ distribution
   # Important: start pi_j near zero (on the logit scale)
   logodds = torch.full([1, p], -8, dtype=torch.float, requires_grad=True)
   return _sgd(x, s, llik=_zinb_llik, params=[log_mean, log_inv_disp, logodds],
-              lr=lr, batch_size=batch_size, verbose=verbose, trace=trace)
+              lr=lr, batch_size=batch_size, max_epochs=max_epochs,
+              verbose=verbose, trace=trace)
