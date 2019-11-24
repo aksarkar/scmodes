@@ -1,6 +1,6 @@
 """Empirical Bayes Poisson Means via SGD
 
-Empirical Bayes Poisson Means (EBPM) is the problem of estimating g, where
+Empirical Bayes Poisson Means is the problem of estimating g, where
 
 x_{ij} ~ Poisson(s_i \lambda_{ij})
 \lambda_{ij} ~ g_j(.)
@@ -54,23 +54,44 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
   return torch.where(torch.lt(x, 1), case_zero, case_non_zero)
 
 def _check_args(x, s, init, lr, batch_size, max_epochs):
+  """Return tensors containing x, s"""
   n, p = x.shape
-  if is not None and s.shape != (n, 1):
-    raise ArgumentError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
+  if s is None:
+    s = torch.tensor(x.sum(axis=1), dtype=torch.float)
+  elif s.shape != (n, 1):
+    raise ValueError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
+  else:
+    s = torch.tensor(s, dtype=torch.float)
+  if ss.issparse(x):
+    raise NotImplementedError('sparse x not supported')
+  else:
+    # Important: this must come after size factor computation
+    x = torch.tensor(x, dtype=torch.float)
   if init is None:
     pass
   elif init[0].shape != (1, p):
-    raise ArgumentError(f'shape mismatch (log_mu): expected {(1, p)}, got {init[0].shape}')
+    raise ValueError(f'shape mismatch (log_mu): expected {(1, p)}, got {init[0].shape}')
   elif init[1].shape != (1, p):
-    raise ArgumentError(f'shape mismatch (log_phi): expected {(1, p)}, got {init[0].shape}')
+    raise ValueError(f'shape mismatch (log_phi): expected {(1, p)}, got {init[1].shape}')
+  elif len(init) > 2:
+    raise ValueError('expected two values in init, got {len(init)}')
   if lr <= 0:
-    raise ArgumentError('lr must be >= 0')
+    raise ValueError('lr must be >= 0')
   if batch_size < 1:
-    raise ArgumentError('batch_size must be >= 1')
+    raise ValueError('batch_size must be >= 1')
   if max_epochs < 1:
-    raise ArgumentError('max_epochs must be >= 1')
+    raise ValueError('max_epochs must be >= 1')
+  return x, s
 
-def _sgd(x, s, llik, params, lr, max_epochs, verbose, trace):
+def _sgd(x, s, llik, params, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
+  """SGD subroutine
+
+  x - [n, p] tensor
+  s - [n, 1] tensor
+  llik - function returning [n, p] tensor
+  params - list of tensor [1, p]
+
+  """
   data = td.DataLoader(td.TensorDataset(x, s, batch_size=batch_size, pin_memory=True))
   if torch.cuda.is_available():
     for p in params:
@@ -84,6 +105,8 @@ def _sgd(x, s, llik, params, lr, max_epochs, verbose, trace):
         x.cuda()
         s.cuda()
       loss = -llik(x, s, log_mean, log_inv_disp).sum()
+      if torch.isnan(loss):
+        raise RuntimeError('nan loss')
       loss.backward()
       opt.step()
       if trace:
@@ -93,24 +116,16 @@ def _sgd(x, s, llik, params, lr, max_epochs, verbose, trace):
   return [p.item() for p in params] + [loss.item()]
 
 def ebpm_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
-  """Return parameters of fitted Gamma distribution g
+  """Return fitted parameters and marginal log likelihood assuming g is a Gamma
+distribution
 
   x - array-like [n, p]
   s - array-like [n, 1]
   init - (log_mu, log_phi) [1, p]
 
   """
-  _check_args(x, s, init, lr, batch_size, max_epochs)
   n, p = x.shape
-  if s is None:
-    s = torch.tensor(x.sum(axis=1), dtype=torch.float)
-  else:
-    s = torch.tensor(s, dtype=torch.float)
-  if ss.issparse(x):
-    raise NotImplementedError('sparse x not supported')
-  else:
-    # Important: this must come after size factor computation
-    x = torch.tensor(x, dtype=torch.float)
+  x, s = _check_args(x, s, init, lr, batch_size, max_epochs)
   if init is None:
     log_mean = torch.zeros([1, p], dtype=torch.float, requires_grad=True)
     log_inv_disp = torch.zeros([1, p], dtype=torch.float, requires_grad=True)
@@ -121,28 +136,20 @@ def ebpm_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, ve
               batch_size=batch_size, verbose=verbose, trace=trace)
 
 def ebpm_point_gamma(x, s=None, init=None, lr=1e-2, batch_size=100, max_epochs=100, verbose=False, trace=False):
-  """Return parameters of the fitted point-Gamma distribution g
+  """Return fitted parameters and marginal log likelihood assuming g is a Gamma
+distribution
 
   x - array-like [n, p]
   s - array-like [n, 1]
   init - (log_mu, log_phi) [1, p]
 
   """
-  _check_args(x, s, init, lr, batch_size, max_epochs)
-  n, p = x.shape
-  if s is None:
-    s = torch.tensor(x.sum(axis=1), dtype=torch.float)
-  else:
-    s = torch.tensor(s, dtype=torch.float)
-  if ss.issparse(x):
-    raise NotImplementedError('sparse x not supported')
-  else:
-    # Important: this must come after size factor computation
-    x = torch.tensor(x, dtype=torch.float)
+  x, s = _check_args(x, s, init, lr, batch_size, max_epochs)
   if init is None:
     if verbose:
       print('Fitting ebpm_gamma to get initialization')
-    init, _ = ebpm_gamma(x, s, lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose)
+    res = ebpm_gamma(x, s, lr=lr, batch_size=batch_size, max_epochs=max_epochs, verbose=verbose)
+    init = res[:-1]
   log_mean = torch.tensor(init[0], dtype=torch.float, requires_grad=True)
   log_inv_disp = torch.tensor(init[1], dtype=torch.float, requires_grad=True)
   # Important: start pi_j near zero (on the logit scale)
