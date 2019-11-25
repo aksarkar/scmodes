@@ -5,7 +5,7 @@ import scmodes
 import scipy.sparse as ss
 import torch
 
-from fixtures import *
+from .fixtures import *
 
 def test_training_score_nmf(simulate):
   x, eta = simulate

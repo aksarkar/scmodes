@@ -4,7 +4,7 @@ import scipy.stats as st
 import scmodes.ebpm
 import scmodes.ebpm.wrappers
 
-from fixtures import *
+from .fixtures import *
 
 def test_ebpm_point():
   np.random.seed(0)
@@ -66,4 +66,10 @@ def test_ebpm_point_expfam(simulate_gamma):
   llik = np.where(x[:,0] > 0,
                   np.log(st.poisson(mu=s * g[1:,0]).pmf(x[:,:1]).dot(g[1:,1])),
                   np.log(st.poisson(mu=s * g[:,0]).pmf(x[:,:1]).dot(g[:,1]))).sum()
+  assert llik > oracle_llik
+
+def test_ebpm_npmle(simulate_gamma):
+  x, s, log_mu, log_phi, oracle_llik = simulate_gamma
+  res = scmodes.ebpm.ebpm_npmle(x[:,0], s.ravel())
+  llik = np.array(res.rx2('loglik'))
   assert llik > oracle_llik

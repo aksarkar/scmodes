@@ -5,7 +5,7 @@ import scipy.stats as st
 import scmodes.ebpm.sgd
 import torch
 
-from fixtures import *
+from .fixtures import *
 
 def test__nb_llik(simulate_gamma):
   x, s, log_mu, log_phi, oracle_llik = simulate_gamma
