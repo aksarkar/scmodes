@@ -8,7 +8,6 @@ import scipy.special as sp
 import scipy.stats as st
 
 rpy2.robjects.pandas2ri.activate()
-ashr = rpy2.robjects.packages.importr('ashr')
 
 def check_args(x, s):
   n = x.shape[0]
@@ -88,8 +87,8 @@ def _zinb_obj(theta, x, s):
   return -np.where(x < 1, case_zero, case_nonzero).sum()
 
 def ebpm_point_gamma(x, s):
-  """Return fitted parameters and marginal log likelihood assuming g is a point-Gamma
-distribution
+  """Return fitted parameters and marginal log likelihood assuming g is a
+point-Gamma distribution
 
   Returns log mu, -log phi, logit pi
 
@@ -111,5 +110,23 @@ distribution
   return mean, inv_disp, logodds, -nll
 
 def ebpm_unimodal(x, s, mixcompdist='halfuniform', **kwargs):
+  """Return fitted parameters and marginal log likelihood assuming g is a
+unimodal distribution
+
+  Wrap around ashr::ash_pois, and return the R object directly.
+
+  """
+  ashr = rpy2.robjects.packages.importr('ashr')
   x, s = check_args(x, s)
   return ashr.ash_pois(pd.Series(x), pd.Series(s), mixcompdist=mixcompdist, **kwargs)
+
+def ebpm_point_expfam(x, s):
+  """Return fitted parameters and marginal log likelihood assuming g is a mixture
+of a point mass on zero and an exponential family parameterized by a natural
+spline
+
+  Wrap around descend::deconvSingle, and return the R object directly.
+
+  """
+  descend = rpy2.robjects.packages.importr('descend')
+  return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s), verbose=False)

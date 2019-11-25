@@ -56,3 +56,14 @@ def test_ebpm_unimodal(simulate_gamma):
   res = scmodes.ebpm.ebpm_unimodal(x[:,0], s.ravel())
   llik = np.array(res.rx2('loglik'))
   assert llik > oracle_llik
+
+def test_ebpm_point_expfam(simulate_gamma):
+  x, s, log_mu, log_phi, oracle_llik = simulate_gamma
+  res = scmodes.ebpm.ebpm_point_expfam(x[:,0], s.ravel())
+  g = np.array(res.slots['distribution'])[:,:2]
+  # Don't marginalize over lambda = 0 for x > 0, because
+  # p(x > 0 | lambda = 0) = 0
+  llik = np.where(x[:,0] > 0,
+                  np.log(st.poisson(mu=s * g[1:,0]).pmf(x[:,:1]).dot(g[1:,1])),
+                  np.log(st.poisson(mu=s * g[:,0]).pmf(x[:,:1]).dot(g[:,1]))).sum()
+  assert llik > oracle_llik
