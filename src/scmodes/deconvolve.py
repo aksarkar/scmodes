@@ -29,13 +29,8 @@ def fit_zig(x, s, num_points=1000):
 def fit_unimodal(x, s, num_points=1000):
   lam = x / s
   grid = np.linspace(lam.min(), lam.max(), num_points)
-  res = ashr.ash_workhorse(
-    pd.Series(np.zeros(x.shape[0])),
-    1,
-    lik=ashr.lik_pois(y=pd.Series(x), scale=pd.Series(s), link='identity'),
-    outputlevel='fitted_g',
-    mixsd=pd.Series(np.exp(np.arange(np.log(1 / s.mean()), np.log(lam.max()), step=.5 * np.log(2)))),
-    mode=pd.Series([lam.min(), lam.max()]))
+  res = ashr.ash_pois(pd.Series(x), pd.Series(s), mixcompdist='halfuniform',
+                      outputlevel='fitted_g')
   F = ashr.cdf_ash(res, grid)
   return [np.array(F.rx2('x')), np.array(F.rx2('y')).ravel()]
 
