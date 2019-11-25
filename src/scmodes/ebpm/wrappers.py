@@ -1,4 +1,11 @@
-"""EBPM via full data numerical solvers"""
+"""EBPM via full data numerical optimization
+
+These methods are suitable to solve EBPM for one gene at a time, but will not
+(immediately) scale to large numbers of genes.
+
+We include wrappers around ashr and DESCEND for convenience.
+
+"""
 import numpy as np
 import pandas as pd
 import rpy2.robjects.packages
@@ -9,7 +16,7 @@ import scipy.stats as st
 
 rpy2.robjects.pandas2ri.activate()
 
-def check_args(x, s):
+def _check_args(x, s):
   n = x.shape[0]
   if x.shape != (n,):
     raise ValueError
@@ -30,7 +37,7 @@ mass
   s - array-like [n, 1]
 
   """
-  x, s = check_args(x, s)
+  x, s = _check_args(x, s)
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
@@ -59,7 +66,7 @@ distribution
   s - array-like [n,]
 
   """
-  x, s = check_args(x, s)
+  x, s = _check_args(x, s)
   # Important: initialize at ebpm_point solution
   opt = so.minimize(_nb_obj, x0=[np.log(x.sum() / s.sum()), 10], args=(x, s), method='Nelder-Mead')
   if not opt.success:
@@ -96,7 +103,7 @@ point-Gamma distribution
   s - array-like [n, 1]
 
   """
-  x, s = check_args(x, s)
+  x, s = _check_args(x, s)
   init = so.minimize(_nb_obj, x0=[np.log(x.sum() / s.sum()), 10], args=(x, s), method='Nelder-Mead')
   if not init.success:
     raise RuntimeError(init.message)
@@ -115,9 +122,11 @@ unimodal distribution
 
   Wrap around ashr::ash_pois, and return the R object directly.
 
+  kwargs - arguments to ashr::ash_pois
+
   """
   ashr = rpy2.robjects.packages.importr('ashr')
-  x, s = check_args(x, s)
+  x, s = _check_args(x, s)
   return ashr.ash_pois(pd.Series(x), pd.Series(s), mixcompdist=mixcompdist, **kwargs)
 
 def ebpm_point_expfam(x, s):
@@ -130,3 +139,20 @@ spline
   """
   descend = rpy2.robjects.packages.importr('descend')
   return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s), verbose=False)
+
+def ebpm_npmle(x, s, K=100):
+  """Return fitted parameters and marginal log likelihood assuming g is an
+arbitrary distribution on non-negative reals
+
+  Wrap around ashr::ash_pois, and return the R object directly.
+
+  K - number of grid points
+
+  """
+  ashr = rpy2.robjects.packages.importr('ashr')
+  x, s = _check_args(x, s)
+  lam = x / s
+  grid = np.linspace(0, lam.max(), K + 1)
+  return ashr.ash_pois(
+    pd.Series(x), pd.Series(s),
+    g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
