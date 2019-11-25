@@ -1,12 +1,7 @@
 """Empirical Bayes Poisson Means via SGD
 
-Empirical Bayes Poisson Means is the problem of estimating g, where
-
-x_{ij} ~ Poisson(s_i \lambda_{ij})
-\lambda_{ij} ~ g_j(.)
-
-For g_j in the family of Gamma distributions, or point-Gamma distributions, the
-marginal likelihood is analytic.
+These implementations are specialized for fitting p EBPM problems on n samples
+in parallel, where n, p may be large.
 
 """
 import scipy.sparse as ss
