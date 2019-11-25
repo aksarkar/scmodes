@@ -138,7 +138,8 @@ spline
 
   """
   descend = rpy2.robjects.packages.importr('descend')
-  return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s), verbose=False)
+  return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s),
+                              do_LRT_test=False, plot_density=False, verbose=False)
 
 def ebpm_npmle(x, s, K=100):
   """Return fitted parameters and marginal log likelihood assuming g is an
