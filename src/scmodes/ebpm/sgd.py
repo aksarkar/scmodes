@@ -34,7 +34,7 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
   """Return ln p(x_i | s_i, g)
 
   x_i ~ Poisson(s_i lambda_i)
-  lambda_i ~ g = sigmoid(logodds) \delta_0(.) + sigmoid(-logodds) Gamma(exp(log_inv_disp), exp(log_mean - log_inv_disp))
+  lambda_i ~ g = sigmoid(logodds) \\delta_0(.) + sigmoid(-logodds) Gamma(exp(log_inv_disp), exp(log_mean - log_inv_disp))
 
   x - [n, p] tensor
   s - [n, 1] tensor
@@ -52,17 +52,16 @@ def _zinb_llik(x, s, log_mean, log_inv_disp, logodds):
 def _check_args(x, s, init, lr, batch_size, max_epochs):
   """Return tensors containing x, s"""
   n, p = x.shape
-  if s is None:
-    s = torch.tensor(x.sum(axis=1), dtype=torch.float)
-  elif s.shape != (n, 1):
-    raise ValueError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
-  else:
-    s = torch.tensor(s, dtype=torch.float)
   if ss.issparse(x):
     raise NotImplementedError('sparse x not supported')
-  else:
-    # Important: this must come after size factor computation
+  elif not isinstance(x, torch.Tensor):
     x = torch.tensor(x, dtype=torch.float)
+  if s is None:
+    s = x.sum(axis=1)
+  elif s.shape != (n, 1):
+    raise ValueError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
+  elif not isinstance(s, torch.Tensor):
+    s = torch.tensor(s, dtype=torch.float)
   if init is None:
     pass
   elif init[0].shape != (1, p):
@@ -129,8 +128,8 @@ distribution
   init - (log_mu, log_phi) [1, p]
 
   """
-  n, p = x.shape
   x, s = _check_args(x, s, init, lr, batch_size, max_epochs)
+  n, p = x.shape
   if init is None:
     log_mean = torch.zeros([1, p], dtype=torch.float, requires_grad=True)
     log_inv_disp = torch.zeros([1, p], dtype=torch.float, requires_grad=True)
@@ -149,10 +148,11 @@ distribution
 
   x - array-like [n, p]
   s - array-like [n, 1]
-  init - (log_mu, log_phi) [1, p]
+  init - (log_mu, -log_phi) [1, p]
 
   """
   x, s = _check_args(x, s, init, lr, batch_size, max_epochs)
+  n, p = x.shape
   if init is None:
     if verbose:
       print('Fitting ebpm_gamma to get initialization')
