@@ -1,22 +1,31 @@
-"""Poisson variational autoencoder
+"""Variational autoencoder models for count data
 
-Under this model,
+Under the VAE (Kingma and Welling 2014; Rezende and Mohamed 2014; Lopez et
+al. 2018),
 
-p(x_ij | z_i) ~ Pois((lambda(z_i))_j)
+p(x_ij | λ_ij) ~ Pois(λ_ij)
 
-where lambda(z_i) is a neural network R^k -> R^p.
+In the simplest case, λ_ij = (λ(z_i))_j, where λ(⋅) is a neural
+network R^k -> R^p. We also consider
 
-The goal is to learn p(z_i | x_i), which is achieved by variational inference:
+λ_ij = (μ_ij(z_i))_j u_ij
+u_ij ~ g(⋅)
 
-q(z_i | x_i) = N(mu(x_i), sigma^2(x_i))
+where μ(⋅) is the neural network, and g is a Gamma distribution. The goal is
+to learn p(z_i | x_i), which is achieved by variational inference assuming
 
-where mu, sigma^2 are neural network outputs R^p -> R^k.
+q(z_i | x_i) = N(m(x_i), diag(S(x_i)))
+
+where m, S are neural network outputs R^p -> R^k. To optimize the ELBO, we use
+the reparameterization gradient. Crucially, these implementations support
+incomplete data associated with weights w_ij ∈ {0, 1} (Nazabal et al. 2018;
+Mattei and Frellsen 2018).
 
 """
 import torch
 
 class Encoder(torch.nn.Module):
-  """Encoder q(z | x) = N(mu(x), sigma^2(x))"""
+  """Encoder q(z | x) = N(m(x), diag(S(x)))"""
   def __init__(self, input_dim, output_dim, hidden_dim=128):
     super().__init__()
     self.net = torch.nn.Sequential(
@@ -35,7 +44,7 @@ class Encoder(torch.nn.Module):
     return self.mean(q), self.scale(q)
 
 class Pois(torch.nn.Module):
-  """Decoder p(x | z) ~ Poisson(s_i lambda(z))"""
+  """Decoder p(x | z) ~ Poisson(s_i λ(z))"""
   def __init__(self, input_dim, output_dim, hidden_dim=128):
     super().__init__()
     self.lam = torch.nn.Sequential(
