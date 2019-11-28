@@ -2,3 +2,4 @@
 
 """
 from .wnmf import *
+from .wglmpca import *
