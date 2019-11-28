@@ -2,15 +2,22 @@ import numpy as np
 import pytest
 import scipy.stats as st
 
-@pytest.fixture
-def simulate():
+def _simulate_log_lam_low_rank(n, p, k):
   np.random.seed(0)
-  l = np.random.normal(size=(100, 3))
-  f = np.random.normal(size=(3, 200))
-  eta = l.dot(f)
-  eta *= 5 / eta.max()
-  x = np.random.poisson(lam=np.exp(eta))
-  return x, eta
+  l = np.random.normal(size=(n, k))
+  f = np.random.normal(size=(k, p))
+  F = st.poisson(mu=np.exp(l.dot(f)))
+  x = F.rvs(size=(n, p))
+  oracle_llik = F.logpmf(x).sum()
+  return x, l, f, oracle_llik
+
+@pytest.fixture
+def simulate_rank1():
+  return _simulate_log_lam_low_rank(100, 200, 1)
+
+@pytest.fixture
+def simulate_rank2():
+  return _simulate_log_lam_low_rank(100, 200, 2)
 
 def _simulate_lam_low_rank(n, p, k):
   np.random.seed(0)

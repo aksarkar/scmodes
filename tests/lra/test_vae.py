@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import pytest
 import scipy.stats as st
-import scmodes.vae
+import scmodes.lra.vae
 
 @pytest.fixture
 def simulate():
@@ -25,7 +25,7 @@ def dims():
 
 def test_encoder(dims):
   n, p, d, stoch_samples = dims
-  enc = scmodes.vae.Encoder(p, d)
+  enc = scmodes.lra.vae.Encoder(p, d)
   x = torch.tensor(np.random.normal(size=(n, p)), dtype=torch.float)
   mean, scale = enc.forward(x)
   assert mean.shape == (n, d)
@@ -33,7 +33,7 @@ def test_encoder(dims):
 
 def test_decoder(dims):
   n, p, d, stoch_samples = dims
-  dec = scmodes.vae.Pois(d, p)
+  dec = scmodes.lra.vae.Pois(d, p)
   x = torch.tensor(np.random.normal(size=(n, d)), dtype=torch.float)
   lam = dec.forward(x)
   assert lam.shape == (n, p)
@@ -44,7 +44,7 @@ def _fit_pvae(x, latent_dim = 10, lr=1e-2, max_epochs=100, stoch_samples=10, ver
   assert s.shape == (n, 1)
   x = torch.tensor(x, dtype=torch.float)
   s = torch.tensor(s, dtype=torch.float)
-  model = scmodes.vae.PVAE(p, latent_dim).fit(x, s, lr=lr, stoch_samples=stoch_samples, max_epochs=max_epochs, verbose=verbose)
+  model = scmodes.lra.vae.PVAE(p, latent_dim).fit(x, s, lr=lr, stoch_samples=stoch_samples, max_epochs=max_epochs, verbose=verbose)
   return model, x
 
 def test_pvae(simulate):

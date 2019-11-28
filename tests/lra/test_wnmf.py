@@ -23,36 +23,32 @@ def test__frob_loss_weight():
   w = np.random.uniform(size=(n, p)) < 0.75
   assert scmodes.lra.wnmf._frob_loss(x, lf=0, w=w) < np.square(np.linalg.norm(x))
 
-def test__pois_loss(simulate):
-  x, eta = simulate
-  oracle_llik = st.poisson(mu=np.exp(eta)).logpmf(x).sum()
-  loss = scmodes.lra.wnmf._pois_loss(x, np.exp(eta))
+def test__pois_loss(simulate_lam_rank1):
+  x, lam = simulate_lam_rank1
+  oracle_llik = st.poisson(mu=lam).logpmf(x).sum()
+  loss = scmodes.lra.wnmf._pois_loss(x, lam)
   assert np.isclose(-loss, oracle_llik)
 
-def test__pois_loss_weight(simulate):
-  x, eta = simulate
+def test__pois_loss_weight(simulate_lam_rank1):
+  x, lam = simulate_lam_rank1
   n, p = x.shape
   # Important: w == 1 denotes presence
   w = np.random.uniform(size=(n, p)) < 0.75
-  oracle_llik = np.where(w, st.poisson(mu=np.exp(eta)).logpmf(x), 0).sum()
-  loss = scmodes.lra.wnmf._pois_loss(x, lam=np.exp(eta), w=w)
+  oracle_llik = np.where(w, st.poisson(mu=lam).logpmf(x), 0).sum()
+  loss = scmodes.lra.wnmf._pois_loss(x, lam=lam, w=w)
   assert np.isclose(-loss, oracle_llik)
 
-def test_nmf_shape(simulate):
-  x, eta = simulate
+def test_nmf_frob_loss(simulate_truncnorm_rank1):
+  x, _, _, oracle_llik = simulate_truncnorm_rank1
   n, p = x.shape
-  l, f, loss = scmodes.lra.nmf(x, rank=1)
+  l, f, loss = scmodes.lra.nmf(x, rank=1, pois_loss=False)
   assert l.shape == (n, 1)
   assert f.shape == (p, 1)
-
-def test_nmf_frob_loss(simulate_truncnorm_rank1):
-  x, l, f, oracle_llik = simulate_truncnorm_rank1
-  lhat, fhat, loss = scmodes.lra.nmf(x, rank=1, pois_loss=False)
   assert -loss > oracle_llik
 
 def test_nmf_frob_loss_rank2(simulate_truncnorm_rank2):
-  x, l, f, oracle_llik = simulate_truncnorm_rank2
-  lhat, fhat, loss = scmodes.lra.nmf(x, rank=2, pois_loss=False)
+  x, _, _, oracle_llik = simulate_truncnorm_rank2
+  _, _, loss = scmodes.lra.nmf(x, rank=2, pois_loss=False)
   assert -loss > oracle_llik
 
 def test_nmf_frob_loss_weight(simulate_truncnorm_rank2):
@@ -68,6 +64,7 @@ def test_nmf_frob_loss_weight(simulate_truncnorm_rank2):
 
 def test_nmf_pois_loss(simulate_lam_rank1):
   x, lam = simulate_lam_rank1
+  n, p = x.shape
   oracle_llik = st.poisson(mu=lam).logpmf(x).sum()
   # For rank 1, MLE is analytic (up to a scaling factor)
   true_l = x.sum(axis=1).astype(float)
@@ -76,12 +73,14 @@ def test_nmf_pois_loss(simulate_lam_rank1):
   true_f /= true_l.sum()
   true_llik = st.poisson(mu=np.outer(true_l, true_f)).logpmf(x).sum()
   l, f, loss = scmodes.lra.nmf(x, rank=1, max_iters=2)
+  assert l.shape == (n, 1)
+  assert f.shape == (p, 1)
   assert np.isclose(-loss, true_llik)
   assert -loss > oracle_llik
 
 def test_nmf_pois_loss_rank2(simulate_lam_rank2):
-  x, eta = simulate_lam_rank2
-  oracle_llik = st.poisson(mu=np.exp(eta)).logpmf(x).sum()
+  x, lam = simulate_lam_rank2
+  oracle_llik = st.poisson(mu=lam).logpmf(x).sum()
   l, f, loss = scmodes.lra.nmf(x, rank=2)
   assert -loss > oracle_llik
 
