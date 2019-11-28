@@ -4,8 +4,8 @@ import scipy.stats as st
 
 def _simulate_log_lam_low_rank(n, p, k):
   np.random.seed(0)
-  l = np.random.normal(size=(n, k))
-  f = np.random.normal(size=(k, p))
+  l = np.random.normal(size=(n, k), scale=.1)
+  f = np.random.normal(size=(k, p), scale=.1)
   F = st.poisson(mu=np.exp(l.dot(f)))
   x = F.rvs(size=(n, p))
   oracle_llik = F.logpmf(x).sum()
