@@ -10,15 +10,15 @@ def _mask_entries(x, frac, seed):
   return np.random.uniform(size=x.shape) > frac
 
 def _pois_loss(x, w, mu):
-  """Return the negative log likelihood of the masked entries, up to a constant"""
+  """Return the per-observation negative log likelihood of the masked entries"""
   # Important: oracle can produce mu == 0
-  return np.where(w, 0, mu - x * np.log(mu + 1e-8)).sum()
+  return -np.where(w, 0, st.poisson(mu=mu).logpmf(x)).mean()
 
 def imputation_score_oracle(x, frac=0.1, seed=0, **kwargs):
   w = _mask_entries(x, frac=frac, seed=seed)
   return _pois_loss(x, w, x)
 
-def imputation_score_wnmf(x, rank=10, frac=0.1, seed=0):
+def imputation_score_wnmf(x, rank=10, frac=0.1, seed=0, **kwargs):
   w = _mask_entries(x, frac=frac, seed=seed)
   l, f, _ = scmodes.lra.nmf(x, w=w, rank=rank)
   return _pois_loss(x, w, l.dot(f.T))
