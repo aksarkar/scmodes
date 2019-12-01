@@ -2,20 +2,20 @@ import scmodes
 
 from .fixtures import *
 
-def test_imputation_score_nmf(simulate):
+def test_imputation_score_wnmf(simulate):
   x, eta = simulate
-  loss = scmodes.benchmark.imputation_score_nmf(x)
+  loss = scmodes.benchmark.imputation_score_wnmf(x)
   assert np.isfinite(loss)
   assert loss > 0
 
-def test_imputation_score_glmpca(simulate):
+def test_imputation_score_wglmpca(simulate):
   x, eta = simulate
-  loss = scmodes.benchmark.imputation_score_glmpca(x)
+  loss = scmodes.benchmark.imputation_score_wglmpca(x)
   assert np.isfinite(loss)
   assert loss > 0
   
 def test_evaluate_imputation(simulate):
   x, eta = simulate
-  result = scmodes.benchmark.evaluate_imputation(x, methods=['nmf', 'glmpca'], rank=1, n_trials=1)
+  result = scmodes.benchmark.evaluate_imputation(x, methods=['wnmf', 'wglmpca'], rank=1, n_trials=1)
   assert result.shape == (2, 3)
   assert np.isfinite(result['loss']).all()

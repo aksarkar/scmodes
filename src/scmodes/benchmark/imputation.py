@@ -13,12 +13,12 @@ def _pois_loss(x, w, mu):
   """Return the negative log likelihood of the masked entries, up to a constant"""
   return np.where(w, 0, mu - x * np.log(mu)).sum()
 
-def imputation_score_nmf(x, rank=10, frac=0.1, seed=0):
+def imputation_score_wnmf(x, rank=10, frac=0.1, seed=0):
   w = _mask_entries(x, frac=frac, seed=seed)
   l, f, _ = scmodes.lra.nmf(x, w=w, rank=rank)
   return _pois_loss(x, w, l.dot(f.T))
 
-def imputation_score_glmpca(x, rank=10, frac=0.1, seed=0, max_retries=10, max_iters=5000):
+def imputation_score_wglmpca(x, rank=10, frac=0.1, seed=0, max_retries=10, max_iters=5000):
   w = _mask_entries(x, frac=frac, seed=seed)
   opt = None
   obj = np.inf
@@ -42,4 +42,3 @@ def evaluate_imputation(x, methods, n_trials=1, **kwargs):
       score = getattr(sys.modules[__name__], f'imputation_score_{m}')(x, seed=i, **kwargs)
       result.append((m, i, score))
   return pd.DataFrame(result, columns=['method', 'trial', 'loss'])
-
