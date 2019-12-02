@@ -54,8 +54,6 @@ def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, atol=1e-8, eps=1e-10, v
   x - array-like [n, p]
   frob - fit Gaussian model
 
-  This implementation supports masked arrays.
-
   """
   if w is None:
     # Important: this simplifies the implementation, but is costly
