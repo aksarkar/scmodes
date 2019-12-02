@@ -46,7 +46,7 @@ def _pois_loss(x, lam, w=None):
     w = 1
   return -(w * (x * _safe_log(lam) - lam - sp.gammaln(x + 1))).sum()
 
-def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, atol=1e-8, verbose=False):
+def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, atol=1e-8, eps=1e-10, verbose=False):
   """Return non-negative loadings and factors (Lee and Seung 2001).
 
   Returns loadings [n, rank] and factors [p, rank]
@@ -77,8 +77,8 @@ def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, atol=1e-8, verbose=Fals
 
   for i in range(max_iters):
     if pois_loss:
-      l *= (w * x) / (l @ f.T) @ f / (w @ f)
-      f *= ((w * x) / (l @ f.T)).T @ l / (w.T @ l)
+      l *= (w * x) / (l @ f.T + eps) @ f / (w @ f)
+      f *= ((w * x) / (l @ f.T + eps)).T @ l / (w.T @ l)
     else:
       l *= (w * x) @ f / (w * (l @ f.T) @ f)
       f *= (w.T * x.T) @ l / (w.T * (f @ l.T) @ l)
