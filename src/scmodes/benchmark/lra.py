@@ -60,6 +60,17 @@ def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
   lam = m.denoise(x)
   return st.poisson(mu=lam).logpmf(x).mean()
 
+def training_score_wglmpca(x, n_components=10, max_restarts=1, max_iters=5000, **kwargs):
+  opt = np.inf
+  for i in range(max_restarts):
+    try:
+      l, f, loss = scmodes.lra.glmpca(x, rank=n_components, max_iters=max_iters)
+    except RuntimeError:
+      continue
+    if loss < opt:
+      opt = loss
+  return -opt
+
 def training_score_scvi(x, n_components=10, **kwargs):
   from scvi.dataset import GeneExpressionDataset
   from scvi.inference import UnsupervisedTrainer
@@ -123,6 +134,22 @@ def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=
   m = (wlra.vae.PVAE(p, n_components)
        .fit(x, s, lr=lr, max_epochs=max_epochs))
   return pois_llik(m.denoise(x), train, test)
+
+def generalization_score_wglmpca(train, test, n_components=10, max_restarts=1, max_iters=5000, **kwargs):
+  opt = None
+  obj = np.inf
+  for i in range(max_restarts):
+    try:
+      l, f, loss = scmodes.lra.glmpca(train.values, rank=n_components, max_iters=max_iters)
+    except RuntimeError:
+      continue
+    if loss < obj:
+      opt = l, f
+      obj = loss
+  if opt is None:
+    return np.nan
+  else:
+    return pois_llik(np.exp(l.dot(f.T)), train, test)
 
 def generalization_score_scvi(train, test, n_components=10, **kwargs):
   from scvi.dataset import GeneExpressionDataset
