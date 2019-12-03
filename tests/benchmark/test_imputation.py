@@ -4,7 +4,13 @@ from .fixtures import *
 
 def test_imputation_score_oracle(simulate):
   x, eta = simulate
-  loss = scmodes.benchmark.imputation_score_wnmf(x)
+  loss = scmodes.benchmark.imputation_score_oracle(x)
+  assert np.isfinite(loss)
+  assert loss > 0
+
+def test_imputation_score_ebpm_point(simulate):
+  x, eta = simulate
+  loss = scmodes.benchmark.imputation_score_ebpm_point(x)
   assert np.isfinite(loss)
   assert loss > 0
 

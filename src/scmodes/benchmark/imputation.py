@@ -18,6 +18,12 @@ def imputation_score_oracle(x, frac=0.1, seed=0, **kwargs):
   w = _mask_entries(x, frac=frac, seed=seed)
   return _pois_loss(x, w, x)
 
+def imputation_score_ebpm_point(x, frac=0.1, seed=0, **kwargs):
+  w = _mask_entries(x, frac=frac, seed=seed)
+  s = (w * x).sum(axis=1)
+  mu = (w * x).sum(axis=0) / s.sum()
+  return _pois_loss(x, w, np.outer(s, mu))
+
 def imputation_score_wnmf(x, rank=10, frac=0.1, seed=0, **kwargs):
   w = _mask_entries(x, frac=frac, seed=seed)
   l, f, _ = scmodes.lra.nmf(x, w=w, rank=rank)
