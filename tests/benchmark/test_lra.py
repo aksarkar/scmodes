@@ -27,7 +27,7 @@ def test_training_score_pvae(simulate):
 
 def test_training_score_wglmpca(simulate):
   x, eta = simulate
-  res = scmodes.benchmark.training_score_wglmpca(x, n_components=10)
+  res = scmodes.benchmark.training_score_wglmpca(pd.DataFrame(x), n_components=10)
   assert np.isfinite(res)
   assert res <= 0
 

@@ -64,7 +64,8 @@ def training_score_wglmpca(x, n_components=10, max_restarts=1, max_iters=5000, *
   opt = np.inf
   for i in range(max_restarts):
     try:
-      l, f, loss = scmodes.lra.glmpca(x, rank=n_components, max_iters=max_iters)
+      # Important: x is assumed to be pd.DataFrame
+      l, f, loss = scmodes.lra.glmpca(x.values, rank=n_components, max_iters=max_iters)
     except RuntimeError:
       continue
     if loss < opt:
