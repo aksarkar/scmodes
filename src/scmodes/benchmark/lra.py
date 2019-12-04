@@ -61,6 +61,7 @@ def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
   return st.poisson(mu=lam).logpmf(x).mean()
 
 def training_score_wglmpca(x, n_components=10, max_restarts=1, max_iters=5000, **kwargs):
+  n, p = x.shape
   opt = np.inf
   for i in range(max_restarts):
     try:
@@ -70,7 +71,8 @@ def training_score_wglmpca(x, n_components=10, max_restarts=1, max_iters=5000, *
       continue
     if loss < opt:
       opt = loss
-  return -opt
+  # Important: scmodes.lra.glmpca return total, we want mean
+  return -opt / (n * p)
 
 def training_score_scvi(x, n_components=10, **kwargs):
   from scvi.dataset import GeneExpressionDataset
