@@ -14,12 +14,12 @@ likelihood, which leads to simple modifications of the estimation algorithm.
 import numpy as np
 from .wnmf import _pois_loss
 
-def glmpca(x, rank, w=None, max_iters=100, atol=1e-8, verbose=False, seed=None):
+def glmpca(x, rank, init=None, w=None, max_iters=100, atol=1e-8, verbose=False, seed=None):
   """Return loadings and factors of a log-linear factor model
 
   x - array-like [n, p]
-  w - array-like [n, p]
   init - (l [n, rank], f [p, rank])
+  w - array-like [n, p]
 
   """
   n, p = x.shape
@@ -27,8 +27,13 @@ def glmpca(x, rank, w=None, max_iters=100, atol=1e-8, verbose=False, seed=None):
     w = np.array(1)
   if seed is not None:
     np.random.seed(seed)
-  l = np.random.normal(size=(n, rank))
-  f = np.random.normal(size=(p, rank))
+  if init is None:
+    l = np.random.normal(size=(n, rank))
+    f = np.random.normal(size=(p, rank))
+  else:
+    l, f = init
+    assert l.shape == (n, rank)
+    assert f.shape == (p, rank)
   # TODO: this can have severe numerical problems
   lam = np.exp(l @ f.T)
   obj = _pois_loss(x, lam, w=w)
