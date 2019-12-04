@@ -20,6 +20,12 @@ def test_imputation_score_wnmf(simulate):
   assert np.isfinite(loss)
   assert loss > 0
 
+def test_imputation_score_wnbmf(simulate):
+  x, eta = simulate
+  loss = scmodes.benchmark.imputation_score_wnbmf(x)
+  assert np.isfinite(loss)
+  assert loss > 0
+
 def test_imputation_score_wglmpca(simulate):
   x, eta = simulate
   loss = scmodes.benchmark.imputation_score_wglmpca(x)

@@ -46,6 +46,11 @@ def imputation_score_wglmpca(x, rank=10, frac=0.1, seed=0, max_retries=10, max_i
   l, f = opt
   return _pois_loss(x, w, np.exp(l.dot(f.T)))
 
+def imputation_score_wnbmf(x, rank=10, frac=0.1, seed=0, inv_disp=1):
+  w = _mask_entries(x, frac=frac, seed=seed)
+  l, f, loss = scmodes.lra.nbmf(x, w=w, rank=rank, inv_disp=inv_disp)
+  return _pois_loss(x, w, l.dot(f.T))
+
 def evaluate_imputation(x, methods, n_trials=1, **kwargs):
   result = []
   for m in methods:

@@ -59,9 +59,9 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
     print(f'nbmf [0]: {obj}')
 
   for i in range(max_iters):
-    l *= ((x / lam) @ f) / (((x + inv_disp) / (lam + inv_disp)) @ f)
+    l *= ((w * x / lam) @ f) / ((w * (x + inv_disp) / (lam + inv_disp)) @ f)
     lam = l @ f.T
-    f *= ((x / lam).T @ l) / (((x + inv_disp) / (lam + inv_disp)).T @ l)
+    f *= ((w * x / lam).T @ l) / ((w * (x + inv_disp) / (lam + inv_disp)).T @ l)
     lam = l @ f.T
     if not fix_inv_disp:
       raise NotImplementedError('estimation of inv_disp not implemented')
