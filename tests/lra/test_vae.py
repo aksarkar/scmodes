@@ -92,6 +92,15 @@ def test_nbvae(simulate):
   x = torch.tensor(x, dtype=torch.float)
   model = scmodes.lra.NBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
 
+def test_nbvae_denoise(simulate):
+  x, eta = simulate
+  x = torch.tensor(x, dtype=torch.float)
+  model = scmodes.lra.NBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+  lam = model.denoise(x)
+  assert lam.shape == x.shape
+  assert np.isfinite(lam).all()
+  assert (lam >= 0).all()
+
 def test_zinbvae_params():
   m0 = scmodes.lra.PVAE(100, 10)
   m1 = scmodes.lra.ZINBVAE(100, 10)
@@ -101,3 +110,12 @@ def test_zinbvae(simulate):
   x, eta = simulate
   x = torch.tensor(x, dtype=torch.float)
   model = scmodes.lra.ZINBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+
+def test_zinbvae_denoise(simulate):
+  x, eta = simulate
+  x = torch.tensor(x, dtype=torch.float)
+  model = scmodes.lra.ZINBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+  lam = model.denoise(x)
+  assert lam.shape == x.shape
+  assert np.isfinite(lam).all()
+  assert (lam >= 0).all()

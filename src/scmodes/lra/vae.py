@@ -178,6 +178,18 @@ class NBVAE(PVAE):
     loss = -torch.sum(error - kl)
     return loss
     
+  @torch.no_grad()
+  def denoise(self, x):
+    if torch.cuda.is_available():
+      x = x.cuda()
+    # Plug E[z | x] into the decoder
+    mu = self.decoder.forward(self.encoder.forward(x)[0])
+    # Expected posterior mean
+    lam = (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
+    if torch.cuda.is_available():
+      lam = lam.cpu()
+    return lam.numpy()
+
 class ZINBVAE(NBVAE):
   def __init__(self, input_dim, latent_dim):
     # Important: only μ is a neural network output, and we still need
@@ -193,3 +205,15 @@ class ZINBVAE(NBVAE):
     error = torch.mean(torch.sum(w * zinb_llik(x, mu, torch.exp(self.log_inv_disp), self.logodds), dim=2), dim=0)
     loss = -torch.sum(error - kl)
     return loss
+    
+  @torch.no_grad()
+  def denoise(self, x):
+    if torch.cuda.is_available():
+      x = x.cuda()
+    # Plug E[z | x] into the decoder
+    mu = self.decoder.forward(self.encoder.forward(x)[0])
+    # Expected posterior mean
+    lam = torch.sigmoid(-self.logodds) * (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
+    if torch.cuda.is_available():
+      lam = lam.cpu()
+    return lam.numpy()
