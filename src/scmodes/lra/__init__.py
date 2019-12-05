@@ -4,3 +4,4 @@
 from .wnmf import nmf
 from .wglmpca import glmpca
 from .wnbmf import nbmf
+from .vae import PVAE, NBVAE, ZINBVAE

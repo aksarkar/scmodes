@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import pytest
 import scipy.stats as st
+import scmodes
 import scmodes.lra.vae
 
 @pytest.fixture
@@ -20,11 +21,11 @@ def dims():
   n = 50
   p = 1000
   d = 20
-  stoch_samples = 10
-  return n, p, d, stoch_samples
+  n_samples = 10
+  return n, p, d, n_samples
 
 def test_encoder(dims):
-  n, p, d, stoch_samples = dims
+  n, p, d, n_samples = dims
   enc = scmodes.lra.vae.Encoder(p, d)
   x = torch.tensor(np.random.normal(size=(n, p)), dtype=torch.float)
   mean, scale = enc.forward(x)
@@ -32,19 +33,16 @@ def test_encoder(dims):
   assert scale.shape == (n, d)
 
 def test_decoder(dims):
-  n, p, d, stoch_samples = dims
+  n, p, d, n_samples = dims
   dec = scmodes.lra.vae.Pois(d, p)
   x = torch.tensor(np.random.normal(size=(n, d)), dtype=torch.float)
   lam = dec.forward(x)
   assert lam.shape == (n, p)
 
-def _fit_pvae(x, latent_dim = 10, lr=1e-2, max_epochs=100, stoch_samples=10, verbose=False):
+def _fit_pvae(x, w=None, latent_dim=10, lr=1e-2, max_epochs=100, n_samples=10, verbose=False):
   n, p = x.shape
-  s = x.sum(axis=1, keepdims=True)
-  assert s.shape == (n, 1)
   x = torch.tensor(x, dtype=torch.float)
-  s = torch.tensor(s, dtype=torch.float)
-  model = scmodes.lra.vae.PVAE(p, latent_dim).fit(x, s, lr=lr, stoch_samples=stoch_samples, max_epochs=max_epochs, verbose=verbose)
+  model = scmodes.lra.PVAE(p, latent_dim).fit(x, w=w, lr=lr, n_samples=n_samples, max_epochs=max_epochs, verbose=verbose)
   return model, x
 
 def test_pvae(simulate):
@@ -67,3 +65,29 @@ def test_pvae_oracle(simulate):
   lam = model.denoise(xt)
   l1 = st.poisson(mu=lam).logpmf(x).sum()
   assert l1 > l0
+
+def test_wpvae(simulate):
+  x, eta = simulate
+  w = torch.ones(x.shape)
+  _fit_pvae(x, w=w, max_epochs=1)
+
+def test_wpvae_n_samples_1(simulate):
+  x, eta = simulate
+  w = torch.ones(x.shape)
+  _fit_pvae(x, w=w, n_samples=1, max_epochs=10)
+
+def test_wpvae_0_weights(simulate):
+  x, eta = simulate
+  w = (np.random.uniform(size=x.shape) < 0.9).astype(np.float32)
+  w = torch.tensor(w)
+  _fit_pvae(x, w=w, n_samples=1, max_epochs=10)
+  
+def test_nbvae_params():
+  m0 = scmodes.lra.PVAE(100, 10)
+  m1 = scmodes.lra.NBVAE(100, 10)
+  assert len(list(m1.parameters())) == len(list(m0.parameters())) + 1
+
+def test_zinbvae_params():
+  m0 = scmodes.lra.PVAE(100, 10)
+  m1 = scmodes.lra.ZINBVAE(100, 10)
+  assert len(list(m1.parameters())) == len(list(m0.parameters())) + 2
