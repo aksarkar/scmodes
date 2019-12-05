@@ -30,10 +30,30 @@ def _nbmf_loss(x, lam, inv_disp, w=None):
     w = 1
   return -np.where(w, st.nbinom(n=inv_disp, p=1 / (1 + lam / inv_disp)).logpmf(x), 0).sum()
 
-def _D_loss_theta(theta, u, w):
+def _D_loss_theta(theta, u, log_u, w):
   """Return the partial derivative of the expected log joint with respect to
-theta = 1 / phi"""
-  return (w * (1 + np.log(theta) + (u - 1) / theta - theta - sp.digamma(theta))).sum()
+theta = 1 / phi
+
+  theta - scalar
+  u - array-like (n, p)
+  log_u - scalar
+  w - array-like (n, p)
+
+  """
+  return (w * (1 + np.log(theta) + log_u - u - sp.digamma(theta))).sum()
+
+def _D2_loss_theta(theta, u, log_u, w):
+  """Return the second partial derivative of the expected log joint with respect
+to theta = 1 / phi
+
+  theta - scalar
+  u - array-like (n, p)
+  log_u - scalar
+  w - array-like (n, p)
+
+  """
+  n, p = w.shape
+  return n * p * (1 / theta - sp.polygamma(1, theta))
 
 def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_inv_disp=True, verbose=False):
   """Return non-negative loadings and factors (Gouvert et al. 2018).
@@ -63,7 +83,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
 
   obj = _nbmf_loss(x, lam, inv_disp, w=w)
   if verbose:
-    print(f'nbmf [0]: {obj}')
+    print(f'nbmf [0]: {obj} {inv_disp}')
 
   for i in range(max_iters):
     l *= ((w * x / lam) @ f) / ((w * (x + inv_disp) / (lam + inv_disp)) @ f)
@@ -71,8 +91,10 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
     f *= ((w * x / lam).T @ l) / ((w * (x + inv_disp) / (lam + inv_disp)).T @ l)
     lam = l @ f.T
     if not fix_inv_disp:
+      # Important: these are expectations under the posterior
       u = (x + inv_disp) / (lam + inv_disp)
-      opt = so.root(_D_loss_theta, x0=inv_disp, args=(u, w))
+      log_u = sp.digamma(x + inv_disp) - np.log(lam + inv_disp)
+      opt = so.root(_D_loss_theta, jac=_D2_loss_theta, x0=inv_disp, args=(u, log_u, w))
       if not opt.success:
         raise RuntimeError(f'M step update to inv_disp failed: {opt.message}')
       inv_disp = opt.x
@@ -80,7 +102,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
     # Important: the updates are monotonic
     assert update <= obj
     if verbose:
-      print(f'nbmf [{i + 1}]: {update}')
+      print(f'nbmf [{i + 1}]: {update} {inv_disp}')
     if np.isclose(update, obj, atol=atol):
       return l, f, update
     else:
