@@ -20,7 +20,7 @@ def training_score_nmf(x, n_components=10, **kwargs):
   m = skd.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(x)
   return st.poisson(mu=m.transform(x).dot(m.components_)).logpmf(x).mean()
 
-def _glmpca(x, n_components, max_restarts):
+def _glmpca(x, n_components, max_restarts, penalty=0):
   # GLMPCA can fail for some (random) initializations, so restart to find one
   # which works
   obj = None
@@ -28,7 +28,7 @@ def _glmpca(x, n_components, max_restarts):
   for i in range(max_restarts):
     try:
       # We use samples x genes, but GLM-PCA expects genes x samples
-      res = glmpca.glmpca(x.values.T, L=n_components, fam='poi')
+      res = glmpca.glmpca(x.values.T, L=n_components, fam='poi', penalty=penalty)
       # Follow GLM-PCA code here, not the paper
       L = np.array(res.rx2('loadings'))
       F = np.array(res.rx2('factors'))
@@ -46,8 +46,8 @@ def _glmpca(x, n_components, max_restarts):
     obj = np.nan
   return s, L, F, obj
 
-def training_score_glmpca(x, n_components=10, max_restarts=1, **kwargs):
-  res = _glmpca(x, n_components, max_restarts)
+def training_score_glmpca(x, n_components=10, max_restarts=1, penalty=0, **kwargs):
+  res = _glmpca(x, n_components=n_components, max_restarts=max_restarts, penalty=penalty)
   return res[-1]
 
 def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
