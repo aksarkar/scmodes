@@ -61,7 +61,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
   Returns loadings [n, rank] and factors [p, rank]
 
   x - array-like [n, p]
-  inv_disp - log inverse dispersion (scalar)
+  inv_disp - inverse dispersion (scalar)
   init - tuple (l, f), where l [n, rank] and f [p, rank]
   w - array-like [n, p]
 
