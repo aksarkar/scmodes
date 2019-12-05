@@ -13,6 +13,8 @@ algorithm.
 
 """
 import numpy as np
+import scipy.optimize as so
+import scipy.special as sp
 import scipy.stats as st
 
 def _nbmf_loss(x, lam, inv_disp, w=None):
@@ -26,7 +28,12 @@ def _nbmf_loss(x, lam, inv_disp, w=None):
   """
   if w is None:
     w = 1
-  return -np.where(w, st.nbinom(n=inv_disp, p=1 / (1 + lam * inv_disp)).logpmf(x), 0).sum()
+  return -np.where(w, st.nbinom(n=inv_disp, p=1 / (1 + lam / inv_disp)).logpmf(x), 0).sum()
+
+def _D_loss_theta(theta, u):
+  """Return the partial derivative of the expected log joint with respect to
+theta = 1 / phi"""
+  return (1 + np.log(theta) + (u - 1) / theta - theta - sp.digamma(theta)).sum()
 
 def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_inv_disp=True, verbose=False):
   """Return non-negative loadings and factors (Gouvert et al. 2018).
@@ -64,7 +71,11 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
     f *= ((w * x / lam).T @ l) / ((w * (x + inv_disp) / (lam + inv_disp)).T @ l)
     lam = l @ f.T
     if not fix_inv_disp:
-      raise NotImplementedError('estimation of inv_disp not implemented')
+      u = (x + inv_disp) / (lam + inv_disp)
+      opt = so.root(_D_loss_theta, x0=inv_disp, args=(u,))
+      if not opt.success:
+        raise RuntimeError(f'M step update to inv_disp failed: {opt.message}')
+      inv_disp = opt.x
     update = _nbmf_loss(x, lam, inv_disp, w=w)
     # Important: the updates are monotonic
     assert update <= obj
