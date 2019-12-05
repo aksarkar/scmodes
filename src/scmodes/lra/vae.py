@@ -166,7 +166,8 @@ class NBVAE(PVAE):
     # Important: only μ is a neural network output, so we can actually reuse
     # the entire PVAE.
     super().__init__(input_dim, latent_dim)
-    self.log_inv_disp = torch.nn.Parameter(torch.zeros([input_dim, 1]))
+    # Important: shape needs to be correct to broadcast
+    self.log_inv_disp = torch.nn.Parameter(torch.zeros([1, input_dim]))
 
   def loss(self, x, w, n_samples):
     mean, scale = self.encoder.forward(x)
@@ -177,13 +178,12 @@ class NBVAE(PVAE):
     loss = -torch.sum(error - kl)
     return loss
     
-class ZINBVAE(PVAE):
+class ZINBVAE(NBVAE):
   def __init__(self, input_dim, latent_dim):
-    # Important: only μ is a neural network output, so we can actually reuse
-    # the entire PVAE.
+    # Important: only μ is a neural network output, and we still need
+    # log_inv_disp, so we can actually reuse the entire NBVAE.
     super().__init__(input_dim, latent_dim)
-    self.log_inv_disp = torch.nn.Parameter(torch.zeros([input_dim, 1]))
-    self.logodds = torch.nn.Parameter(torch.zeros([input_dim, 1]))
+    self.logodds = torch.nn.Parameter(torch.zeros([1, input_dim]))
 
   def loss(self, x, w, n_samples):
     mean, scale = self.encoder.forward(x)
