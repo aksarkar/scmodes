@@ -57,7 +57,7 @@ class Pois(torch.nn.Module):
     )
 
   def forward(self, x):
-    return self.lam(x) + 1e-8
+    return self.lam(x) + 1e-15
 
 def kl_term(mean, scale):
   """KL divergence between N(mean, scale) and N(0, 1)"""
@@ -108,7 +108,9 @@ class PVAE(torch.nn.Module):
     self.decoder = Pois(latent_dim, input_dim)
 
   def loss(self, x, w, n_samples):
-    mean, scale = self.encoder.forward(x)
+    # Important: if w ∈ {0, 1}, then we need to mask entries going into the
+    # decoder
+    mean, scale = self.encoder.forward(w * x)
     # [batch_size]
     # Important: this is analytic
     kl = torch.sum(kl_term(mean, scale), dim=1)
@@ -116,7 +118,7 @@ class PVAE(torch.nn.Module):
     qz = torch.distributions.Normal(mean, scale).rsample(n_samples)
     # [n_samples, batch_size, input_dim]
     lam = self.decoder.forward(qz)
-    error = torch.mean(torch.sum(w * pois_llik(x, lam), dim=2), dim=0)
+    error = torch.mean(torch.sum(torch.reshape(w, [1, w.shape[0], w.shape[1]]) * pois_llik(x, lam), dim=2), dim=0)
     # Important: optim minimizes
     loss = -torch.sum(error - kl)
     return loss
@@ -129,10 +131,7 @@ class PVAE(torch.nn.Module):
 
     """
     if w is None:
-      w = torch.tensor(1)
-    else:
-      # This is needed to broadcast properly
-      w = torch.reshape(w, [1, w.shape[0], w.shape[1]])
+      w = torch.tensor([[1]], dtype=torch.float)
     if torch.cuda.is_available():
       # Move the model and data to the GPU
       self.cuda()
@@ -162,19 +161,27 @@ class PVAE(torch.nn.Module):
     return lam.numpy()
 
 class NBVAE(PVAE):
-  def __init__(self, input_dim, latent_dim):
+  def __init__(self, input_dim, latent_dim, disp_by_gene=False):
+    """Initialize the VAE parameters
+
+    disp_by_gene - if True, model one dispersion parameter per gene
+
+    """
     # Important: only μ is a neural network output, so we can actually reuse
     # the entire PVAE.
     super().__init__(input_dim, latent_dim)
-    # Important: shape needs to be correct to broadcast
-    self.log_inv_disp = torch.nn.Parameter(torch.zeros([1, input_dim]))
+    if disp_by_gene:
+      # Important: shape needs to be correct to broadcast
+      self.log_inv_disp = torch.nn.Parameter(torch.zeros([1, input_dim]))
+    else:
+      self.log_inv_disp = torch.nn.Parameter(torch.zeros([1]))
 
   def loss(self, x, w, n_samples):
-    mean, scale = self.encoder.forward(x)
+    mean, scale = self.encoder.forward(w * x)
     kl = torch.sum(kl_term(mean, scale), dim=1)
     qz = torch.distributions.Normal(mean, scale).rsample(n_samples)
     mu = self.decoder.forward(qz)
-    error = torch.mean(torch.sum(w * nb_llik(x, mu, torch.exp(self.log_inv_disp)), dim=2), dim=0)
+    error = torch.mean(torch.sum(torch.reshape(w, [1, w.shape[0], w.shape[1]]) * nb_llik(x, mu, torch.exp(self.log_inv_disp)), dim=2), dim=0)
     loss = -torch.sum(error - kl)
     return loss
     
@@ -191,18 +198,21 @@ class NBVAE(PVAE):
     return lam.numpy()
 
 class ZINBVAE(NBVAE):
-  def __init__(self, input_dim, latent_dim):
+  def __init__(self, input_dim, latent_dim, disp_by_gene=False, logodds_by_gene=False):
     # Important: only μ is a neural network output, and we still need
     # log_inv_disp, so we can actually reuse the entire NBVAE.
-    super().__init__(input_dim, latent_dim)
-    self.logodds = torch.nn.Parameter(torch.zeros([1, input_dim]))
+    super().__init__(input_dim, latent_dim, disp_by_gene=disp_by_gene)
+    if logodds_by_gene:
+      self.logodds = torch.nn.Parameter(torch.zeros([1, input_dim]))
+    else:
+      self.logodds = torch.nn.Parameter(torch.zeros([1]))
 
   def loss(self, x, w, n_samples):
-    mean, scale = self.encoder.forward(x)
+    mean, scale = self.encoder.forward(w * x)
     kl = torch.sum(kl_term(mean, scale), dim=1)
     qz = torch.distributions.Normal(mean, scale).rsample(n_samples)
     mu = self.decoder.forward(qz)
-    error = torch.mean(torch.sum(w * zinb_llik(x, mu, torch.exp(self.log_inv_disp), self.logodds), dim=2), dim=0)
+    error = torch.mean(torch.sum(torch.reshape(w, [1, w.shape[0], w.shape[1]]) * zinb_llik(x, mu, torch.exp(self.log_inv_disp), self.logodds), dim=2), dim=0)
     loss = -torch.sum(error - kl)
     return loss
     
