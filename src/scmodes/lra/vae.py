@@ -123,15 +123,18 @@ class PVAE(torch.nn.Module):
     loss = -torch.sum(error - kl)
     return loss
 
-  def fit(self, x, max_epochs, w=None, verbose=False, n_samples=10, **kwargs):
+  def fit(self, x, max_epochs, w=None, n_samples=10, trace=False, verbose=False, **kwargs):
     """Fit the model
 
     :param x: torch.tensor [n_cells, n_genes]
     :param w: torch.tensor [n_cells, n_genes]
+    :param kwargs: arguments to torch.optim.RMSprop
 
     """
     if w is None:
       w = torch.tensor([[1]], dtype=torch.float)
+    if trace:
+      self.trace = []
     if torch.cuda.is_available():
       # Move the model and data to the GPU
       self.cuda()
@@ -148,6 +151,8 @@ class PVAE(torch.nn.Module):
       opt.step()
       if verbose and not epoch % 10:
         print(f'[epoch={epoch}] elbo={-loss}')
+      if trace:
+        self.trace.append(loss.detach().cpu().numpy())
     return self
 
   @torch.no_grad()
