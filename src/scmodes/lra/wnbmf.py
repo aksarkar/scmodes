@@ -55,7 +55,7 @@ to theta = 1 / phi
   n, p = w.shape
   return n * p * (1 / theta - sp.polygamma(1, theta))
 
-def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_inv_disp=True, verbose=False):
+def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, tol=1, fix_inv_disp=True, verbose=False):
   """Return non-negative loadings and factors (Gouvert et al. 2018).
 
   Returns loadings [n, rank] and factors [p, rank]
@@ -64,6 +64,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
   inv_disp - inverse dispersion (scalar)
   init - tuple (l, f), where l [n, rank] and f [p, rank]
   w - array-like [n, p]
+  tol - threshold for change in log likelihood (convergence criterion)
 
   """
   if w is None:
@@ -103,7 +104,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, atol=1e-8, fix_in
     assert update <= obj
     if verbose:
       print(f'nbmf [{i + 1}]: {update} {inv_disp}')
-    if np.isclose(update, obj, atol=atol):
+    if obj - update <= tol:
       return l, f, update
     else:
       obj = update
