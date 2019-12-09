@@ -28,6 +28,7 @@ def _nbmf_loss(x, lam, inv_disp, w=None):
   """
   if w is None:
     w = 1
+  # Important: scipy.stats parameterizes p(k | n, p) ∝ p^n (1 - p)^k
   return -np.where(w, st.nbinom(n=inv_disp, p=1 / (1 + lam / inv_disp)).logpmf(x), 0).sum()
 
 def _D_loss_theta(theta, u, log_u, w):
@@ -42,18 +43,31 @@ theta = 1 / phi
   """
   return (w * (1 + np.log(theta) + log_u - u - sp.digamma(theta))).sum()
 
-def _D2_loss_theta(theta, u, log_u, w):
-  """Return the second partial derivative of the expected log joint with respect
-to theta = 1 / phi
+def _update_inv_disp(x, w, lam, inv_disp, step=1, c=0.5, tau=0.5):
+  """Backtracking line search to update inverse dispersion
 
-  theta - scalar
-  u - array-like (n, p)
-  log_u - scalar
+  x - array-like (n, p)
   w - array-like (n, p)
+  lam - array-like (n, p)
+  inv_disp - scalar (>= 0)
+  step - initial step size
+  c - control parameter (Armijo-Goldstein condition)
+  tau - control parameter (step size update)
 
   """
-  n, p = w.shape
-  return n * p * (1 / theta - sp.polygamma(1, theta))
+  # Important: these are expectations under the posterior
+  u = (x + inv_disp) / (lam + inv_disp)
+  log_u = sp.digamma(x + inv_disp) - np.log(lam + inv_disp)
+
+  # Important: take steps wrt log_inv_disp to avoid non-negativity constraint
+  log_inv_disp = np.log(inv_disp)
+  d = _D_loss_theta(inv_disp, u, log_u, w) * inv_disp
+  loss = _nbmf_loss(x, lam, inv_disp=inv_disp, w=w)
+  update = _nbmf_loss(x, lam, inv_disp=np.exp(log_inv_disp + step * d), w=w)
+  while not np.isfinite(update) or update > loss + c * step * d:
+    step *= tau
+    update = _nbmf_loss(x, lam, inv_disp=np.exp(log_inv_disp + step * d), w=w)
+  return np.exp(log_inv_disp + step * d) + 1e-15
 
 def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, tol=1, fix_inv_disp=True, verbose=False):
   """Return non-negative loadings and factors (Gouvert et al. 2018).
@@ -92,13 +106,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, tol=1, fix_inv_di
     f *= ((w * x / lam).T @ l) / ((w * (x + inv_disp) / (lam + inv_disp)).T @ l)
     lam = l @ f.T
     if not fix_inv_disp:
-      # Important: these are expectations under the posterior
-      u = (x + inv_disp) / (lam + inv_disp)
-      log_u = sp.digamma(x + inv_disp) - np.log(lam + inv_disp)
-      opt = so.root(_D_loss_theta, jac=_D2_loss_theta, x0=inv_disp, args=(u, log_u, w))
-      if not opt.success:
-        raise RuntimeError(f'M step update to inv_disp failed: {opt.message}')
-      inv_disp = opt.x
+      inv_disp = _update_inv_disp(x, w, lam, inv_disp)
     update = _nbmf_loss(x, lam, inv_disp, w=w)
     # Important: the updates are monotonic
     assert update <= obj
