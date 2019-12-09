@@ -46,13 +46,14 @@ def _pois_loss(x, lam, w=None):
     w = 1
   return -(w * (x * _safe_log(lam) - lam - sp.gammaln(x + 1))).sum()
 
-def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, atol=1e-8, eps=1e-10, verbose=False):
+def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, tol=1, eps=1e-10, verbose=False):
   """Return non-negative loadings and factors (Lee and Seung 2001).
 
   Returns loadings [n, rank] and factors [p, rank]
 
   x - array-like [n, p]
   frob - fit Gaussian model
+  tol - threshold for change in log likelihood (convergence criterion)
 
   """
   if w is None:
@@ -86,7 +87,7 @@ def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, atol=1e-8, eps=1e-10, v
     assert update <= obj
     if verbose:
       print(f'nmf [{i + 1}]: {update}')
-    if np.isclose(update, obj, atol=atol):
+    if obj - update <= tol:
       return l, f, update
     else:
       obj = update
