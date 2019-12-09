@@ -156,14 +156,27 @@ class PVAE(torch.nn.Module):
     return self
 
   @torch.no_grad()
-  def denoise(self, x):
+  def predict(self, x, n_samples=None, return_cpu=True, return_numpy=True):
     if torch.cuda.is_available():
       x = x.cuda()
-    # Plug E[z | x] into the decoder
-    lam = self.decoder.forward(self.encoder.forward(x)[0])
-    if torch.cuda.is_available():
-      lam = lam.cpu()
-    return lam.numpy()
+    mean, scale = self.encoder.forward(x)
+    if n_samples is None:
+      # Plug E[z | x] into the decoder
+      mu = self.decoder.forward(mean)
+    else:
+      qz = torch.distributions.Normal(mean, scale).rsample(torch.Size([n_samples]))
+      # [n_samples, x.shape[0], x.shape[1]]
+      mu = self.decoder.forward(qz).mean(dim=0)
+    if return_cpu and torch.cuda.is_available():
+      mu = mu.cpu()
+    if return_numpy:
+      return mu.numpy()
+    else:
+      return mu
+
+  @torch.no_grad()
+  def denoise(self, x, n_samples=None):
+    return self.predict(x, n_samples, return_cpu=True, return_numpy=True)
 
 class NBVAE(PVAE):
   def __init__(self, input_dim, latent_dim, disp_by_gene=False):
@@ -189,13 +202,10 @@ class NBVAE(PVAE):
     error = torch.mean(torch.sum(torch.reshape(w, [1, w.shape[0], w.shape[1]]) * nb_llik(x, mu, torch.exp(self.log_inv_disp)), dim=2), dim=0)
     loss = -torch.sum(error - kl)
     return loss
-    
+
   @torch.no_grad()
-  def denoise(self, x):
-    if torch.cuda.is_available():
-      x = x.cuda()
-    # Plug E[z | x] into the decoder
-    mu = self.decoder.forward(self.encoder.forward(x)[0])
+  def denoise(self, x, n_samples=None):
+    mu = self.predict(x, n_samples, return_cpu=torch.cuda.is_available(), return_numpy=False)
     # Expected posterior mean
     lam = (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
     if torch.cuda.is_available():
@@ -222,11 +232,8 @@ class ZINBVAE(NBVAE):
     return loss
     
   @torch.no_grad()
-  def denoise(self, x):
-    if torch.cuda.is_available():
-      x = x.cuda()
-    # Plug E[z | x] into the decoder
-    mu = self.decoder.forward(self.encoder.forward(x)[0])
+  def denoise(self, x, n_samples=None):
+    mu = self.predict(x, n_samples, return_cpu=torch.cuda.is_available(), return_numpy=False)
     # Expected posterior mean
     lam = torch.sigmoid(-self.logodds) * (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
     if torch.cuda.is_available():

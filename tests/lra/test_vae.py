@@ -57,6 +57,14 @@ def test_pvae_denoise(simulate):
   assert np.isfinite(lam).all()
   assert (lam >= 0).all()
 
+def test_pvae_predict(simulate):
+  x, eta = simulate
+  model, xt = _fit_pvae(x, max_epochs=1)
+  lam = model.predict(xt)
+  assert lam.shape == x.shape
+  assert np.isfinite(lam).all()
+  assert (lam >= 0).all()
+
 @pytest.mark.skip('unfair comparison')
 def test_pvae_oracle(simulate):
   x, eta = simulate
@@ -101,6 +109,24 @@ def test_nbvae_denoise(simulate):
   assert np.isfinite(lam).all()
   assert (lam >= 0).all()
 
+def test_nbvae_predict(simulate):
+  x, eta = simulate
+  x = torch.tensor(x, dtype=torch.float)
+  model = scmodes.lra.NBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+  mu = model.predict(x)
+  assert mu.shape == x.shape
+  assert np.isfinite(mu).all()
+  assert (mu >= 0).all()
+
+def test_nbvae_predict_samples(simulate):
+  x, eta = simulate
+  x = torch.tensor(x, dtype=torch.float)
+  model = scmodes.lra.NBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+  mu = model.predict(x, n_samples=100)
+  assert mu.shape == x.shape
+  assert np.isfinite(mu).all()
+  assert (mu >= 0).all()
+
 def test_zinbvae_params():
   m0 = scmodes.lra.PVAE(100, 10)
   m1 = scmodes.lra.ZINBVAE(100, 10)
@@ -119,3 +145,21 @@ def test_zinbvae_denoise(simulate):
   assert lam.shape == x.shape
   assert np.isfinite(lam).all()
   assert (lam >= 0).all()
+
+def test_zinbvae_predict(simulate):
+  x, eta = simulate
+  x = torch.tensor(x, dtype=torch.float)
+  model = scmodes.lra.ZINBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+  mu = model.predict(x)
+  assert mu.shape == x.shape
+  assert np.isfinite(mu).all()
+  assert (mu >= 0).all()
+
+def test_zinbvae_predict_samples(simulate):
+  x, eta = simulate
+  x = torch.tensor(x, dtype=torch.float)
+  model = scmodes.lra.ZINBVAE(input_dim=x.shape[1], latent_dim=10).fit(x, lr=1e-2, n_samples=10, max_epochs=1)
+  mu = model.predict(x, n_samples=100)
+  assert mu.shape == x.shape
+  assert np.isfinite(mu).all()
+  assert (mu >= 0).all()
