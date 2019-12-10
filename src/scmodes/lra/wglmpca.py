@@ -2,9 +2,9 @@
 
 We seek to fit the model
 
-x_{ij} ~ Poisson(\\mu_{ij})
+x_{ij} ~ Poisson(μ_{ij})
 
-where \\ln \\mu_{ij} = (LF)_{ij}. GLM-PCA fits this model using Fisher scoring
+where ln μ_{ij} = (LF)_{ij}. GLM-PCA fits this model using Fisher scoring
 updates (Newton-Raphson updates, using the Fisher information instead of the
 Hessian) to maximize the log likelihood (Townes 2019). To handle missing data,
 we introduce weights (indicators of non-missingness) w_{ij} into the log
@@ -28,8 +28,8 @@ def glmpca(x, rank, init=None, w=None, max_iters=100, atol=1e-8, verbose=False, 
   if seed is not None:
     np.random.seed(seed)
   if init is None:
-    l = np.random.normal(size=(n, rank))
-    f = np.random.normal(size=(p, rank))
+    l = np.random.normal(scale=1 / rank, size=(n, rank))
+    f = np.random.normal(scale=1 / rank, size=(p, rank))
   else:
     l, f = init
     assert l.shape == (n, rank)
@@ -40,10 +40,12 @@ def glmpca(x, rank, init=None, w=None, max_iters=100, atol=1e-8, verbose=False, 
   if verbose:
     print(f'wglmpca [0]: {obj}')
   for i in range(max_iters):
-    l += (w * (x - lam)) @ f / ((w * lam) @ np.diag(f @ f.T).reshape(-1, 1))
-    lam = np.exp(l @ f.T)
-    f += (w * (x - lam)).T @ l / ((w.T * lam.T) @ np.diag(l @ l.T).reshape(-1, 1))
-    lam = np.exp(l @ f.T)
+    for k in range(rank):
+      l[:,k] += (w * (x - lam)) @ f[:,k] / ((w * lam) @ np.square(f[:,k]))
+      lam = np.exp(l @ f.T)
+    for k in range(rank):
+      f[:,k] += (w * (x - lam)).T @ l[:,k] / ((w.T * lam.T) @ np.square(l[:,k]))
+      lam = np.exp(l @ f.T)
     update = _pois_loss(x, lam, w=w)
     if verbose:
       print(f'wglmpca [{i}]: {update}')
