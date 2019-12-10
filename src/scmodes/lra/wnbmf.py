@@ -43,7 +43,7 @@ theta = 1 / phi
   """
   return (w * (1 + np.log(theta) + log_u - u - sp.digamma(theta))).sum()
 
-def _update_inv_disp(x, w, lam, inv_disp, step=1, c=0.5, tau=0.5):
+def _update_inv_disp(x, w, lam, inv_disp, step=1, c=0.5, tau=0.5, max_iters=30):
   """Backtracking line search to update inverse dispersion
 
   x - array-like (n, p)
@@ -64,10 +64,15 @@ def _update_inv_disp(x, w, lam, inv_disp, step=1, c=0.5, tau=0.5):
   d = _D_loss_theta(inv_disp, u, log_u, w) * inv_disp
   loss = _nbmf_loss(x, lam, inv_disp=inv_disp, w=w)
   update = _nbmf_loss(x, lam, inv_disp=np.exp(log_inv_disp + step * d), w=w)
-  while not np.isfinite(update) or update > loss + c * step * d:
+  while (not np.isfinite(update) or update > loss + c * step * d) and max_iters > 0:
     step *= tau
     update = _nbmf_loss(x, lam, inv_disp=np.exp(log_inv_disp + step * d), w=w)
-  return np.exp(log_inv_disp + step * d) + 1e-15
+    max_iters -= 1
+  if max_iters == 0:
+    # Step size is small enough that update can be skipped
+    return inv_disp
+  else:
+    return np.exp(log_inv_disp + step * d) + 1e-15
 
 def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, tol=1, fix_inv_disp=True, verbose=False):
   """Return non-negative loadings and factors (Gouvert et al. 2018).
