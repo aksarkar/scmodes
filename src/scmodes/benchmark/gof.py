@@ -1,16 +1,15 @@
 import functools as ft
 import numpy as np
 import pandas as pd
+import rpy2.robjects.numpy2ri
 import rpy2.robjects.packages
 import rpy2.robjects.pandas2ri
-import rpy2.robjects.numpy2ri
-import scipy.integrate as si
-import scipy.stats as st
+import scipy.sparse as ss
 import scipy.special as sp
+import scipy.stats as st
 import sys
 
 rpy2.robjects.pandas2ri.activate()
-rpy2.robjects.numpy2ri.activate()
 
 ashr = rpy2.robjects.packages.importr('ashr')
 descend = rpy2.robjects.packages.importr('descend')
@@ -103,29 +102,18 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
     pmf[x == 0] += pi0
   return pmf
 
-def gof_gamma(x, s=None, chunksize=1000, **kwargs):
-  import scqtl.tf
-  onehot = np.ones((x.shape[0], 1))
+def gof_gamma(x, s=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
+  import scmodes.ebpm.sgd
+  # Important: x is assumed to be pd.DataFrame
+  x_csr = ss.csr_matrix(x.values)
+  x_csc = x_csr.tocsc()
   if s is None:
-    s = x.sum(axis=1).values.reshape(-1, 1)
-  design = np.zeros((x.shape[0], 1))
-  result = []
-  for i in range(int(np.ceil(x.shape[1] / chunksize))):
-    chunk = x.iloc[:,chunksize * i:chunksize * (i + 1)]
-    log_mu, log_phi, *_ = scqtl.tf.fit(
-      umi=chunk.values.astype(np.float32),
-      onehot=onehot.astype(np.float32),
-      design=design.astype(np.float32),
-      size_factor=s.astype(np.float32),
-      learning_rate=1e-3,
-      max_epochs=30000)
-    log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
-    log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
-    for k in chunk:
-      d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-                 size=s.ravel(), log_mu=log_mu.loc[0,k],
-                 log_phi=log_phi.loc[0,k])
-      result.append((k, d, p))
+    s = x_csc.sum(axis=1)
+  res = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
+  for gene, (log_mu, neg_log_phi) in zip(x.columns, np.vstack(res[:-1]).T):
+    d, p = _gof(x_csc[:,j].A.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
+                size=s, log_mu=log_mu, log_phi=-neg_log_phi)
+    result.append((k, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
@@ -165,7 +153,7 @@ def gof_zig(x, s=None, chunksize=1000, **kwargs):
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def _ash_cdf(x, fit, s):
+def _ash_cdf(x, fit, s, thresh=1e-8):
   """Compute marginal CDF of the data"""
   # Ref: https://lsun.github.io/truncash/diagnostic_plot.html#ash:_normal_likelihood,_uniform_mixture_prior
   a = np.array(fit.rx2('fitted_g').rx2('a'))
@@ -176,7 +164,9 @@ def _ash_cdf(x, fit, s):
   F = np.zeros((N, K))
   for i in range(N):
     for k in range(K):
-      if x[i] < 0:
+      if pi[k] < thresh:
+        continue
+      elif x[i] < 0:
         # Important: we need to handle x = -1
         F[i,k] = 0
       elif np.isclose(a[k], b[k]):
