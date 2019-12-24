@@ -101,12 +101,14 @@ def _check_args(x, s, init, lr, batch_size, max_epochs):
   n, p = x.shape
   if s is None:
     s = x.sum(axis=1)
-  elif  s.shape != (n, 1):
+  elif s.shape != (n, 1):
     raise ValueError(f'shape mismatch (s): expected {(n, 1)}, got {s.shape}')
   elif not isinstance(s, torch.FloatTensor):
     s = torch.tensor(s, dtype=torch.float)
   else:
     s = s
+  if any(s == 0):
+    raise ValueError(f'all size factors must be > 0')
   if ss.issparse(x):
     data = EBPMDataset(x, s)
   elif not isinstance(x, torch.Tensor):

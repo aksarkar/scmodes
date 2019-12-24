@@ -109,46 +109,29 @@ def gof_gamma(x, s=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
   x_csc = x_csr.tocsc()
   if s is None:
     s = x_csc.sum(axis=1)
-  res = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
-  for gene, (log_mu, neg_log_phi) in zip(x.columns, np.vstack(res[:-1]).T):
+  fit = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
+  result = []
+  for j, (gene, (log_mu, neg_log_phi)) in enumerate(zip(x.columns, np.vstack(fit[:-1]).T)):
     d, p = _gof(x_csc[:,j].A.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
                 size=s, log_mu=log_mu, log_phi=-neg_log_phi)
-    result.append((k, d, p))
+    result.append((gene, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def gof_zig(x, s=None, chunksize=1000, **kwargs):
-  import scqtl.tf
-  onehot = np.ones((x.shape[0], 1))
+def gof_zig(x, s=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
+  import scmodes.ebpm.sgd
+  # Important: x is assumed to be pd.DataFrame
+  x_csr = ss.csr_matrix(x.values)
+  x_csc = x_csr.tocsc()
   if s is None:
-    s = x.sum(axis=1).values.reshape(-1, 1)
-  design = np.zeros((x.shape[0], 1))
+    s = x_csc.sum(axis=1)
+  fit = scmodes.ebpm.sgd.ebpm_point_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
   result = []
-  for i in range(int(np.ceil(x.shape[1] / chunksize))):
-    chunk = x.iloc[:,chunksize * i:chunksize * (i + 1)]
-    init = scqtl.tf.fit(
-      umi=chunk.values.astype(np.float32),
-      onehot=onehot.astype(np.float32),
-      design=design.astype(np.float32),
-      size_factor=s.astype(np.float32),
-      learning_rate=1e-3,
-      max_epochs=30000)
-    log_mu, log_phi, logodds, *_ = scqtl.tf.fit(
-      umi=chunk.values.astype(np.float32),
-      onehot=onehot.astype(np.float32),
-      size_factor=s.astype(np.float32),
-      learning_rate=1e-3,
-      max_epochs=30000,
-      warm_start=init[:3])
-    log_mu = pd.DataFrame(log_mu, columns=chunk.columns)
-    log_phi = pd.DataFrame(log_phi, columns=chunk.columns)
-    logodds = pd.DataFrame(logodds, columns=chunk.columns)
-    for k in chunk:
-      d, p = _gof(chunk[k].values.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-                 size=s.ravel(), log_mu=log_mu.loc[0,k],
-                 log_phi=log_phi.loc[0,k], logodds=logodds.loc[0,k])
-      result.append((k, d, p))
+  for j, (gene, (log_mu, neg_log_phi, logodds)) in enumerate(zip(x.columns, np.vstack(fit[:-1]).T)):
+    d, p = _gof(x_csc[:,j].A.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
+                size=s, log_mu=log_mu, log_phi=-neg_log_phi, logodds=logodds)
+    result.append((gene, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
