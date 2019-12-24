@@ -164,6 +164,8 @@ def _sgd(data, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_worker
     result = [p.cpu().detach().numpy() for p in params]
   else:
     result = [p.detach().numpy() for p in params]
+  # Clean up GPU memory
+  del params[:]
   result.append(loss.item())
   if trace:
     result.append(param_trace)
