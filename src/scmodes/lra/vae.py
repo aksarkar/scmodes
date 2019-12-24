@@ -157,7 +157,7 @@ class PVAE(torch.nn.Module):
 
   @torch.no_grad()
   def predict(self, x, n_samples=None, return_cpu=True, return_numpy=True):
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not x.is_cuda:
       x = x.cuda()
     mean, scale = self.encoder.forward(x)
     if n_samples is None:
@@ -205,7 +205,9 @@ class NBVAE(PVAE):
 
   @torch.no_grad()
   def denoise(self, x, n_samples=None):
-    mu = self.predict(x, n_samples, return_cpu=torch.cuda.is_available(), return_numpy=False)
+    if torch.cuda.is_available:
+      x = x.cuda()
+    mu = self.predict(x, n_samples, return_cpu=not torch.cuda.is_available(), return_numpy=False)
     # Expected posterior mean
     lam = (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
     if torch.cuda.is_available():
@@ -233,7 +235,9 @@ class ZINBVAE(NBVAE):
     
   @torch.no_grad()
   def denoise(self, x, n_samples=None):
-    mu = self.predict(x, n_samples, return_cpu=torch.cuda.is_available(), return_numpy=False)
+    if torch.cuda.is_available:
+      x = x.cuda()
+    mu = self.predict(x, n_samples, return_cpu=not torch.cuda.is_available(), return_numpy=False)
     # Expected posterior mean
     lam = torch.sigmoid(-self.logodds) * (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
     if torch.cuda.is_available():
