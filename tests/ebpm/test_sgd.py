@@ -182,13 +182,8 @@ def test_EBPMDataset_init_coo(simulate_point_gamma):
 def test_EBPMDataset__get_item__(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma
   data = scmodes.ebpm.sgd.EBPMDataset(x, s)
-  y, t = data[0]
-  if torch.cuda.is_available():
-    assert (y.cpu().numpy() == x[0]).all()
-    assert t.cpu().numpy() == s[0]
-  else:
-    assert (y.numpy() == x[0]).all()
-    assert t.numpy() == s[0]
+  y = data[0]
+  assert y == 0
 
 def test_EBPMDataset_collate_fn(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma
@@ -202,10 +197,23 @@ def test_EBPMDataset_collate_fn(simulate_point_gamma):
     assert (y.numpy() == x[:batch_size]).all()
     assert (t.numpy() == s[:batch_size]).all()
 
+def test_EBPMDataset_collate_fn_shuffle(simulate_point_gamma):
+  x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma
+  data = scmodes.ebpm.sgd.EBPMDataset(x, s)
+  idx = [10, 20, 30, 40, 50]
+  y, t = data.collate_fn(idx)
+  if torch.cuda.is_available():
+    assert (y.cpu().numpy() == x[idx]).all()
+    assert (t.cpu().numpy() == s[idx]).all()
+  else:
+    assert (y.numpy() == x[idx]).all()
+    assert (t.numpy() == s[idx]).all()
+
 def test_EBPMDataset_DataLoader(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, l0 = simulate_point_gamma
   batch_size = 10
-  data = td.DataLoader(scmodes.ebpm.sgd.EBPMDataset(x, s), batch_size=batch_size, shuffle=False)
+  sparse_data = scmodes.ebpm.sgd.EBPMDataset(x, s)
+  data = td.DataLoader(sparse_data, batch_size=batch_size, shuffle=False, collate_fn=sparse_data.collate_fn)
   y, t = next(iter(data))
   if torch.cuda.is_available():
     assert (y.cpu().numpy() == x[:batch_size]).all()

@@ -27,6 +27,14 @@ class EBPMDataset(td.Dataset):
     self.s = torch.tensor(s, dtype=torch.float, device=device)
 
   def __getitem__(self, index):
+    """Dummy implementation of __getitem__
+
+    torch.utils.DataLoader.__next__() calls:
+
+    batch = self.collate_fn([self.dataset[i] for i in indices])
+
+    This is too slow, so instead of actually returning the data, like:
+
     start = self.indptr[index]
     end = self.indptr[index + 1]
     return (
@@ -37,19 +45,28 @@ class EBPMDataset(td.Dataset):
         self.data[start:end], size=[1, self.p]).to_dense().squeeze(),
       self.s[index]
     )
+
+    and then concatenating in collate_fn, just return the index.
+    """
+    return index
     
   def __len__(self):
     return self.n
 
   def collate_fn(self, indices):
-    """Return a minibatch of items"""
-    # Important: this is *much* faster than [data[i] for i in indices]
+    """Return a minibatch of items
+
+    Construct the entire sparse tensor in one shot, and then convert to
+    dense. This is *much* faster than the default:
+
+    torch.stack([data[i] for i in indices])
+
+    """
     return (
       torch.sparse.FloatTensor(
         torch.cat([
-          torch.stack([torch.full(((self.indptr[i + 1] - self.indptr[i]).item(),), i - indices[0],
-                                  dtype=torch.long, device=self.indices.device),
-                       self.indices[self.indptr[i]:self.indptr[i + 1]]]) for i in indices], dim=1),
+          torch.stack([torch.full(((self.indptr[i + 1] - self.indptr[i]).item(),), j, dtype=torch.long, device=self.indices.device),
+                       self.indices[self.indptr[i]:self.indptr[i + 1]]]) for j, i in enumerate(indices)], dim=1),
         torch.cat([self.data[self.indptr[i]:self.indptr[i + 1]] for i in indices]),
         size=[len(indices), self.p]).to_dense().squeeze(),
       self.s[indices]
@@ -142,9 +159,16 @@ def _sgd(data, llik, params, lr=1e-2, batch_size=100, max_epochs=100, num_worker
   params - list of tensor [1, p]
 
   """
+  # Important: this is required for EBPMDataset, but TensorDataset does not
+  # define collate_fn.
+  #
+  # The default value of this kwarg in td.DataLoader.__init__ has changed since
+  # torch 0.4.1 (which we are using)
+  collate_fn = getattr(data, 'collate_fn', td.dataloader.default_collate)
   data = td.DataLoader(data, batch_size=batch_size, num_workers=num_workers,
                        # Important: only CPU memory can be pinned
-                       pin_memory=not torch.cuda.is_available())
+                       pin_memory=not torch.cuda.is_available(),
+                       collate_fn=collate_fn)
   opt = torch.optim.RMSprop(params, lr=lr)
   param_trace = []
   loss = None
