@@ -205,7 +205,7 @@ class NBVAE(PVAE):
 
   @torch.no_grad()
   def denoise(self, x, n_samples=None):
-    if torch.cuda.is_available:
+    if torch.cuda.is_available():
       x = x.cuda()
     mu = self.predict(x, n_samples, return_cpu=not torch.cuda.is_available(), return_numpy=False)
     # Expected posterior mean
@@ -235,7 +235,7 @@ class ZINBVAE(NBVAE):
     
   @torch.no_grad()
   def denoise(self, x, n_samples=None):
-    if torch.cuda.is_available:
+    if torch.cuda.is_available():
       x = x.cuda()
     mu = self.predict(x, n_samples, return_cpu=not torch.cuda.is_available(), return_numpy=False)
     # Expected posterior mean
