@@ -91,4 +91,4 @@ def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, tol=1, eps=1e-10, verbo
       return l, f, update
     else:
       obj = update
-  raise RuntimeError('failed to converge')
+  raise RuntimeError('max_iters exceeded')
