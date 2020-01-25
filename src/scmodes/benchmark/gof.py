@@ -61,8 +61,8 @@ def _rpp(cdf, pmf):
 def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal CDF of Poisson-(point) Gamma model
 
-  x_i ~ Poisson(s_i \lambda_i)
-  lambda_i ~ \pi_0 \delta_0(\cdot) + (1 - \pi_0) Gamma(1 / \phi, 1 / (\mu\phi))
+  x_i ~ Poisson(s_i \\lambda_i)
+  lambda_i ~ \\pi_0 \\delta_0(\\cdot) + (1 - \\pi_0) Gamma(1 / \\phi, 1 / (\\mu\\phi))
 
   size - scalar or array-like (n,)
   log_mu - scalar
@@ -84,8 +84,8 @@ def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
 def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal PMF of Poisson-(point) Gamma model
 
-  x_i ~ Poisson(s_i \lambda_i)
-  lambda_i ~ \pi_0 \delta_0(\cdot) + (1 - \pi_0) Gamma(1 / \phi, 1 / (\mu\phi))
+  x_i ~ Poisson(s_i \\lambda_i)
+  lambda_i ~ \\pi_0 \\delta_0(\\cdot) + (1 - \\pi_0) Gamma(1 / \\phi, 1 / (\\mu\\phi))
 
   size - scalar or array-like (n,)
   log_mu - scalar
