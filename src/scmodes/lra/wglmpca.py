@@ -28,8 +28,9 @@ def glmpca(x, rank, init=None, w=None, max_iters=100, atol=1e-8, verbose=False, 
   if seed is not None:
     np.random.seed(seed)
   if init is None:
-    l = np.random.normal(scale=1 / rank, size=(n, rank))
-    f = np.random.normal(scale=1 / rank, size=(p, rank))
+    # TODO: if this is too close to zero, the update can explode
+    l = np.random.normal(size=(n, rank))
+    f = np.random.normal(size=(p, rank))
   else:
     l, f = init
     assert l.shape == (n, rank)
