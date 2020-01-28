@@ -24,27 +24,30 @@ def _glmpca(x, n_components, max_restarts, penalty=0):
   # GLMPCA can fail for some (random) initializations, so restart to find one
   # which works
   obj = None
-  s = np.log(x.values.mean(axis=1, keepdims=True))
   for i in range(max_restarts):
     try:
       # We use samples x genes, but GLM-PCA expects genes x samples
-      res = glmpca.glmpca(x.values.T, L=n_components, fam='poi', penalty=penalty)
-      # Follow GLM-PCA code here, not the paper
-      L = np.array(res.rx2('loadings'))
-      F = np.array(res.rx2('factors'))
-      lam = np.exp(s + F.T.dot(L))
+      res = glmpca.glmpca(x.values.T,
+                          L=n_components,
+                          fam='poi',
+                          penalty=penalty,
+                          ctl=rpy2.robjects.vectors.ListVector({'maxIter': 1000, 'eps': 1e-15}))
+      L = pd.DataFrame(res.rx2('loadings')).values
+      F = pd.DataFrame(res.rx2('factors')).values
+      lam = np.exp(F @ L.T)
       llik = st.poisson(mu=lam).logpmf(x.values).mean()
       print(f'glmpca {i} {llik:.3g}')
       if obj is None or llik > obj:
         obj = llik
-    except:
-      print(f'glmpca {i} failed')
+    except Exception as e:
+      print(f'glmpca {i} failed: {e.__cause__}')
       continue
   if obj is None:
     L = None
     F = None
     obj = np.nan
-  return s, L, F, obj
+  # Important: return loadings (n, k) and factors (p, k)
+  return F, L, obj
 
 def training_score_glmpca(x, n_components=10, max_restarts=1, penalty=0, **kwargs):
   res = _glmpca(x, n_components=n_components, max_restarts=max_restarts, penalty=penalty)
@@ -120,14 +123,11 @@ def generalization_score_nmf(train, test, n_components=10, **kwargs):
   return pois_llik(m.transform(train).dot(m.components_), train, test)
 
 def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **kwargs):
-  _, L, F, llik = _glmpca(train, n_components, max_restarts)
+  L, F, llik = _glmpca(train, n_components, max_restarts)
   if np.isnan(llik):
     return np.nan
   else:
-    # Follow GLM-PCA code here
-    s = np.log(test.values.mean(axis=1, keepdims=True))
-    lam = np.exp(s + F.T.dot(L))
-    return st.poisson(mu=lam).logpmf(test.values).mean()
+    return pois_llik(np.exp(L @ F.T), train, test)
 
 def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
   n, p = train.shape
