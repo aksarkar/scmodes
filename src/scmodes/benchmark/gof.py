@@ -15,7 +15,7 @@ ashr = rpy2.robjects.packages.importr('ashr')
 descend = rpy2.robjects.packages.importr('descend')
 
 def _gof(x, cdf, pmf, **kwargs):
-  """Test for goodness of fit x_i ~ \hat{F}(.)
+  """Test for goodness of fit x_i ~ \\hat{F}(.)
 
   If x_i ~ F(.), then F(x_i) ~ Uniform(0, 1). Use randomized predictive
   p-values to handle discontinuous F.
@@ -199,6 +199,36 @@ def gof_unimodal(x, s=None, pool=None, **kwargs):
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
+
+def _point_expfam_cdf(x, res, size):
+  if tuple(res.rclass) != ('DESCEND',):
+    raise ValueError('res is not a DESCEND object')
+  n = x.shape[0]
+  assert x.shape == (n,)
+  assert size.shape == (n,)
+  g = np.array(res.slots['distribution'])[:,:2]
+  F = np.zeros(x.shape[0])
+  for i in range(x.shape[0]):
+    if x[i] < 0:
+      F[i] = 0
+    elif x[i] == 0:
+      F[i] = st.poisson(mu=size[i] * g[:,0]).pmf(x[i]).dot(g[:,1])
+    else:
+      F[i] = st.poisson(mu=size[i] * g[:,0]).pmf(np.arange(x[i] + 1).reshape(-1, 1)).dot(g[:,1]).sum()
+  return F
+
+def _point_expfam_pmf(x, size, res):
+  if tuple(res.rclass) != ('DESCEND',):
+    raise ValueError('res is not a DESCEND object')
+  n = x.shape[0]
+  assert x.shape == (n,)
+  assert size.shape == (n,)
+  g = np.array(res.slots['distribution'])[:,:2]
+  # Don't marginalize over lambda = 0 for x > 0, because
+  # p(x > 0 | lambda = 0) = 0
+  return np.where(x > 0,
+                  st.poisson(mu=np.outer(size, g[1:,0])).pmf(x.reshape(-1, 1)).dot(g[1:,1]),
+                  st.poisson(mu=np.outer(size, g[:,0])).pmf(x.reshape(-1, 1)).dot(g[:,1]))
 
 def evaluate_gof(x, methods, **kwargs):
   result = {}

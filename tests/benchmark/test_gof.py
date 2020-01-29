@@ -181,6 +181,36 @@ def test_gof_unimodal_size(test_data):
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
 
+def test__point_expfam_cdf(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  xj = x['ENSG00000116251']
+  res = scmodes.ebpm.ebpm_point_expfam(xj, s)
+  F = scmodes.benchmark.gof._point_expfam_cdf(xj.values.ravel(), res=res, size=s)
+  assert np.isfinite(F).all()
+  assert (F >= 0).all()
+  assert (F <= 1).all()
+
+def test__point_expfam_pmf(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  xj = x['ENSG00000116251']
+  res = scmodes.ebpm.ebpm_point_expfam(xj, s)
+  f = scmodes.benchmark.gof._point_expfam_pmf(xj.values.ravel(), res=res, size=s)
+  assert np.isfinite(f).all()
+  assert (f >= 0).all()
+  assert (f <= 1).all()
+
+def test__point_expfam_cdf_pmf(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  xj = x['ENSG00000116251']
+  res = scmodes.ebpm.ebpm_point_expfam(xj, s)
+  F = scmodes.benchmark.gof._point_expfam_cdf(xj.values.ravel(), res=res, size=s)
+  F_1 = scmodes.benchmark.gof._point_expfam_cdf(xj.values.ravel() - 1, res=res, size=s)
+  f = scmodes.benchmark.gof._point_expfam_pmf(xj.values.ravel(), res=res, size=s)
+  assert np.isclose(F - F_1, f).all()
+
 def test_evaluate_gof(test_data):
   x = test_data
   res = scmodes.benchmark.evaluate_gof(x, methods=['gamma', 'zig'])
