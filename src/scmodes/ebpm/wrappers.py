@@ -110,11 +110,8 @@ point-Gamma distribution
   opt = so.minimize(_zinb_obj, x0=[init.x[0], init.x[1], -8], args=(x, s), method='Nelder-Mead')
   if not opt.success:
     raise RuntimeError(opt.message)
-  mean = np.exp(opt.x[0])
-  inv_disp = np.exp(opt.x[1])
-  logodds = opt.x[2]
   nll = opt.fun
-  return mean, inv_disp, logodds, -nll
+  return opt.x[0], opt.x[1], opt.x[2], -nll
 
 def ebpm_unimodal(x, s, mixcompdist='halfuniform', **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is a
