@@ -6,7 +6,6 @@ import rpy2.robjects.pandas2ri
 import rpy2.robjects.numpy2ri
 import scipy.special as sp
 import scipy.stats as st
-import scqtl.simple
 
 rpy2.robjects.pandas2ri.activate()
 
@@ -16,14 +15,14 @@ descend = rpy2.robjects.packages.importr('descend')
 def fit_gamma(x, s, num_points=1000):
   lam = x / s
   grid = np.linspace(lam.min(), lam.max(), num_points)
-  res = scqtl.simple.fit_nb(x, s)
-  return [grid, st.gamma(a=res[1], scale=res[0] / res[1]).cdf(grid)]
+  res = scmodes.ebpm.ebpm_gamma(x, s)
+  return [grid, st.gamma(a=np.exp(res[1]), scale=np.exp(res[0] - res[1])).cdf(grid)]
 
 def fit_zig(x, s, num_points=1000):
   lam = x / s
   grid = np.linspace(lam.min(), lam.max(), num_points)
-  res = scqtl.simple.fit_zinb(x, s)
-  F = sp.expit(res[2]) + sp.expit(-res[2]) * st.gamma(a=res[1], scale=res[0] / res[1]).cdf(grid)
+  res = scmodes.ebpm.ebpm_point_gamma(x, s)
+  F = sp.expit(res[2]) + sp.expit(-res[2]) * st.gamma(a=np.exp(res[1]), scale=np.exp(res[0] - res[1])).cdf(grid)
   return [grid, F]
 
 def fit_unimodal(x, s, num_points=1000):
