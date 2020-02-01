@@ -1,3 +1,4 @@
+import anndata
 import functools as ft
 import numpy as np
 import pandas as pd
@@ -7,6 +8,7 @@ import rpy2.robjects.pandas2ri
 import scipy.sparse as ss
 import scipy.special as sp
 import scipy.stats as st
+import scmodes
 import sys
 
 rpy2.robjects.pandas2ri.activate()
@@ -102,35 +104,61 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
     pmf[x == 0] += pi0
   return pmf
 
-def gof_gamma(x, s=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
-  import scmodes.ebpm.sgd
-  # Important: x is assumed to be pd.DataFrame
-  x_csr = ss.csr_matrix(x.values)
+def _sgd_prepare(x, s, key):
+  if isinstance(x, pd.DataFrame):
+    x_csr = ss.csr_matrix(x.values)
+    genes = x.columns
+  elif isinstance(x, anndata.AnnData):
+    if not ss.isspmatrix_csr(x.X):
+      x_csr = ss.csr_matrix(x.X)
+    else:
+      x_csr = x.X
+    if key is None:
+      genes = x.var.iloc[:,0]
+    else:
+      genes = x.var[key]
+  elif not ss.isspmatrix_csr(x):
+    x_csr = ss.csr_matrix(x)
+  else:
+    x_csr = x
   x_csc = x_csr.tocsc()
   if s is None:
-    s = x_csc.sum(axis=1)
+    s = x_csc.sum(axis=1).A
+  return x_csr, x_csc, s, genes
+
+def gof_gamma(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
+  """Fit and test for departure from Poisson-Gamma distribution for each column of x
+
+  x - array-like (n, p) (can be e.g. pd.DataFrame or anndata.AnnData)
+  s - size factor (n, 1) (default: total molecules per sample)
+  key - if x is anndata.AnnData, column of x.var to use as key (default: first column)
+
+  """
+  x_csr, x_csc, s, genes = _sgd_prepare(x, s, key)
   fit = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
   result = []
-  for j, (gene, (log_mu, neg_log_phi)) in enumerate(zip(x.columns, np.vstack(fit[:-1]).T)):
+  for j, (gene, (log_mu, neg_log_phi)) in enumerate(zip(genes, np.vstack(fit[:-1]).T)):
     d, p = _gof(x_csc[:,j].A.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-                size=s, log_mu=log_mu, log_phi=-neg_log_phi)
+                size=s.ravel(), log_mu=log_mu, log_phi=-neg_log_phi)
     result.append((gene, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def gof_zig(x, s=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
-  import scmodes.ebpm.sgd
-  # Important: x is assumed to be pd.DataFrame
-  x_csr = ss.csr_matrix(x.values)
-  x_csc = x_csr.tocsc()
-  if s is None:
-    s = x_csc.sum(axis=1)
+def gof_zig(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
+  """Fit and test for departure from Poisson-point-Gamma distribution for each column of x
+
+  x - array-like (n, p) (can be e.g. pd.DataFrame or anndata.AnnData)
+  s - size factor (n, 1) (default: total molecules per sample)
+  key - if x is anndata.AnnData, column of x.var to use as key (default: first column)
+
+  """
+  x_csr, x_csc, s, genes = _sgd_prepare(x, s, key)
   fit = scmodes.ebpm.sgd.ebpm_point_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
   result = []
-  for j, (gene, (log_mu, neg_log_phi, logodds)) in enumerate(zip(x.columns, np.vstack(fit[:-1]).T)):
+  for j, (gene, (log_mu, neg_log_phi, logodds)) in enumerate(zip(genes, np.vstack(fit[:-1]).T)):
     d, p = _gof(x_csc[:,j].A.ravel(), cdf=_zig_cdf, pmf=_zig_pmf,
-                size=s, log_mu=log_mu, log_phi=-neg_log_phi, logodds=logodds)
+                size=s.ravel(), log_mu=log_mu, log_phi=-neg_log_phi, logodds=logodds)
     result.append((gene, d, p))
   return (pd.DataFrame(result)
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')

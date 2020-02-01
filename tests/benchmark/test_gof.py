@@ -1,3 +1,4 @@
+import anndata
 import multiprocessing as mp
 import numpy as np
 import os
@@ -5,6 +6,7 @@ import pandas as pd
 import pytest
 import rpy2.robjects.packages
 import rpy2.robjects.pandas2ri
+import scipy.sparse as ss
 import scipy.stats as st
 import scmodes
 import scmodes.benchmark.gof
@@ -80,6 +82,24 @@ def test_gof_gamma_size(test_data):
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
 
+def test_gof_gamma_adata(test_data):
+  x = test_data
+  y = anndata.AnnData(x.values, obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
+  res = scmodes.benchmark.gof_gamma(y, lr=1e-3)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+  assert (res.index == x.columns).all()
+
+def test_gof_gamma_adata_key(test_data):
+  x = test_data
+  y = anndata.AnnData(x.values, obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
+  res = scmodes.benchmark.gof_gamma(y, key=0, lr=1e-3)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+  assert (res.index == x.columns).all()
+
 def test_gof_zig(test_data):
   x = test_data
   res = scmodes.benchmark.gof_zig(x)
@@ -94,6 +114,24 @@ def test_gof_zig_size(test_data):
   assert res.shape[0] == x.shape[1]
   assert np.isfinite(res['stat']).all()
   assert np.isfinite(res['p']).all()
+
+def test_gof_zig_adata(test_data):
+  x = test_data
+  y = anndata.AnnData(x.values, obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
+  res = scmodes.benchmark.gof_zig(y, lr=1e-3)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+  assert (res.index == x.columns).all()
+
+def test_gof_zig_adata_key(test_data):
+  x = test_data
+  y = anndata.AnnData(x.values, obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
+  res = scmodes.benchmark.gof_zig(y, key=0, lr=1e-3)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+  assert (res.index == x.columns).all()
 
 def test__ash_pmf(test_data):
   x = test_data

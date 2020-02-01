@@ -1,3 +1,4 @@
+import anndata
 import numpy as np
 import pandas as pd
 import scipy.io
@@ -27,26 +28,23 @@ def simulate_pois_size(n, p, rank, s, seed=0):
   x = np.random.poisson(lam=s * mu)
   return x, mu
 
-def read_10x(prefix, min_detect=0.25, p=None, return_df=False, seed=0):
+def read_10x(prefix, min_detect=0.25, return_adata=False, return_df=False):
+  if return_adata and return_df:
+    raise ValueError('only one of return_adata and return_df must be True')
   counts = scipy.io.mmread(f'{prefix}/matrix.mtx.gz').tocsr()
   samples = pd.read_csv(f'{prefix}/barcodes.tsv.gz', sep='\t', header=None)
   genes = pd.read_csv(f'{prefix}/genes.tsv.gz', sep='\t', header=None)
   # Important: counts is genes x samples
   if min_detect >= 0:
     keep_genes = ((counts > 0).mean(axis=1) >= min_detect).A.ravel()
-    counts = counts[keep_genes].A.astype(np.int)
+    counts = counts[keep_genes]
     genes = genes.loc[keep_genes]
   else:
     raise ValueError('min_detect must be >= 0')
-  if p is not None:
-    if p <= 0:
-      raise ValueError('p must be > 0')
-    np.random.seed(seed)
-    keep_genes = np.random.choice(counts.shape[0], p, replace=False)
-    counts = counts[keep_genes]
-    genes = genes.iloc[keep_genes]
-  if return_df:
-    return pd.DataFrame(counts.T, index=samples[0], columns=genes[0])
+  if return_adata:
+    return anndata.AnnData(counts.T.tocsr(), obs=samples, var=genes)
+  elif return_df:
+    return pd.DataFrame(counts.A.T, index=samples[0].values, columns=genes[0].values)
   else:
     return counts.T
 
