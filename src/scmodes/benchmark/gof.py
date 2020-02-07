@@ -83,6 +83,19 @@ def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
   cdf = np.where(x >= 0, pi0 + (1 - pi0) * cdf, cdf)
   return cdf
 
+def gof_point(x, s=None, **kwargs):
+  if s is None:
+    s = x.values.sum(axis=1).ravel()
+  result = []
+  for gene in x:
+    log_mu, _ = scmodes.ebpm.ebpm_point(x[gene], s)
+    fit = st.poisson(mu=s * np.exp(log_mu))
+    d, p = _gof(x[gene], cdf=fit.cdf, pmf=fit.pmf)
+    result.append((gene, d, p))
+  return (pd.DataFrame(result)
+          .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
+          .set_index('gene'))
+
 def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
   """Return marginal PMF of Poisson-(point) Gamma model
 

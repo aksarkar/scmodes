@@ -38,6 +38,13 @@ def test__rpp():
   vals = scmodes.benchmark.gof._rpp(F, f)
   assert vals.shape == x.shape
 
+def test_gof_point(test_data):
+  x = test_data
+  res = scmodes.benchmark.gof_point(x)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
 def test_gamma_cdf():
   np.random.seed(0)
   x = st.nbinom(n=10, p=.1).rvs(size=100)
