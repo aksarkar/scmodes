@@ -84,6 +84,12 @@ def _zig_cdf(x, size, log_mu, log_phi, logodds=None):
   return cdf
 
 def gof_point(x, s=None, **kwargs):
+  """Fit and test for departure from Poisson distribution for each column of x
+
+  x - pd.DataFrame (n, p)
+  s - size factor (n,) (default: total molecules per sample)
+
+  """
   if s is None:
     s = x.values.sum(axis=1).ravel()
   result = []
@@ -226,6 +232,13 @@ def _gof_unimodal(k, x, size):
   return k, d, p
 
 def gof_unimodal(x, s=None, pool=None, **kwargs):
+  """Fit and test for departure from Poisson-unimodal distribution for each column of x
+
+  x - pd.DataFrame (n, p)
+  s - size factor (n,) (default: total molecules per sample)
+  pool - multiprocessing.Pool object
+
+  """
   result = []
   if s is None:
     s = x.sum(axis=1)
