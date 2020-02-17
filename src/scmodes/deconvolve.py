@@ -6,6 +6,7 @@ import rpy2.robjects.pandas2ri
 import rpy2.robjects.numpy2ri
 import scipy.special as sp
 import scipy.stats as st
+import scmodes
 
 rpy2.robjects.pandas2ri.activate()
 
