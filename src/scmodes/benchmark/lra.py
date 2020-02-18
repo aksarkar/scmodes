@@ -53,7 +53,7 @@ def training_score_glmpca(x, n_components=10, max_restarts=1, penalty=0, **kwarg
   res = _glmpca(x, n_components=n_components, max_restarts=max_restarts, penalty=penalty)
   return res[-1]
 
-def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
+def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=2000, **kwargs):
   n, p = x.shape
   s = x.values.sum(axis=1, keepdims=True)
   x = torch.tensor(x.values, dtype=torch.float)
@@ -112,7 +112,7 @@ def train_test_split(x, p=0.5):
     else:
       raise NotImplementedError('sparse matrix type not supported')
   else:
-    train = np.random.binomial(n=x, p=p, size=x.shape)
+    train = np.random.binomial(n=x.astype(np.int), p=p, size=x.shape)
   if isinstance(x, pd.DataFrame):
     train = pd.DataFrame(train, index=x.index, columns=x.columns)
   test = x - train
@@ -129,7 +129,7 @@ def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **
   else:
     return pois_llik(np.exp(L @ F.T), train, test)
 
-def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=1000, **kwargs):
+def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=2000, **kwargs):
   n, p = train.shape
   s = train.values.sum(axis=1, keepdims=True)
   x = torch.tensor(train.values, dtype=torch.float)
