@@ -14,16 +14,6 @@ def test_glmpca_rank1(simulate_rank1):
   assert np.isfinite(f).all()
   assert -loss > oracle_llik
 
-def test_glmpca_rank1_step(simulate_rank1):
-  x, _, _, oracle_llik = simulate_rank1
-  n, p = x.shape
-  l, f, loss = scmodes.lra.glmpca(x, rank=1, max_iters=1000, step=0.5, seed=0)
-  assert l.shape == (n, 1)
-  assert f.shape == (p, 1)
-  assert np.isfinite(l).all()
-  assert np.isfinite(f).all()
-  assert -loss > oracle_llik
-
 def test_glmpca_rank2(simulate_rank2):
   x, _, _, oracle_llik = simulate_rank2
   n, p = x.shape

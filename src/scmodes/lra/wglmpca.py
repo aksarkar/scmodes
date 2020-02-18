@@ -14,7 +14,67 @@ likelihood, which leads to simple modifications of the estimation algorithm.
 import numpy as np
 from .wnmf import _pois_loss
 
-def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, step=1, atol=1e-8, verbose=False, seed=None):
+def _update_l_k(l, f, k, x, w, step=1, c=0.5, tau=0.5, max_iters=30):
+  """Return updated loadings and loss function
+
+  Use backtracking line search to find the step size for the update
+
+  l - array-like (n, m)
+  f - array-like (p, m)
+  k - scalar (0 <= k < m)
+  x - array-like (n, p)
+  w - array-like (,) or (n, p). This needs to be compatible with matrix multiplication
+  step - initial step size
+  c - control parameter (Armijo-Goldstein condition)
+  tau - control parameter (step size update)
+  max_iters - maximum number of backtracking steps
+
+  """
+  lam = np.exp(l @ f.T)
+  loss = _pois_loss(x, lam, w)
+  d = (w * (x - lam)) @ f[:,k] / ((w * lam) @ np.square(f[:,k]))
+  update = _pois_loss(x, lam * np.exp(step * np.outer(d, f[:,k])), w)
+  while (not np.isfinite(update) or (update > loss + c * step * d).any()) and max_iters > 0:
+    step *= tau
+    update = _pois_loss(x, lam * np.exp(step * np.outer(d, f[:,k])), w)
+    max_iters -= 1
+  if max_iters == 0:
+    # Step size is small enough that update can be skipped
+    return l[:,k], loss
+  else:
+    return l[:,k] + step * d, update
+
+def _update_f_k(l, f, k, x, w, step=1, c=0.5, tau=0.5, max_iters=30):
+  """Return updated factors and loss function
+
+  Use backtracking line search to find the step size for the update
+
+  l - array-like (n, m)
+  f - array-like (p, m)
+  k - scalar (0 <= k < m)
+  x - array-like (n, p)
+  w - array-like (,) or (n, p). This needs to be compatible with matrix multiplication
+  step - initial step size
+  c - control parameter (Armijo-Goldstein condition)
+  tau - control parameter (step size update)
+  max_iters - maximum number of backtracking steps
+
+  """
+  lam = np.exp(l @ f.T)
+  loss = _pois_loss(x, lam, w)
+  d = (w * (x - lam)).T @ l[:,k] / ((w.T * lam.T) @ np.square(l[:,k]))
+  update = _pois_loss(x, lam * np.exp(step * np.outer(l[:,k], d)), w)
+  while (not np.isfinite(update) or (update > loss + c * step * d).any()) and max_iters > 0:
+    step *= tau
+    update = _pois_loss(x, lam * np.exp(step * np.outer(l[:,k], d)), w)
+    max_iters -= 1
+  if max_iters == 0:
+    # Step size is small enough that update can be skipped
+    return f[:,k], loss
+  else:
+    return f[:,k] + step * d, update
+
+def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, atol=1e-8, verbose=False, seed=None):
   """Return loadings and factors of a log-linear factor model
 
   x - array-like [n, p]
@@ -22,7 +82,10 @@ def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, step=1, atol=1e-8,
   s - size factor [n, 1]
   init - (l [n, rank], f [p, rank])
   w - array-like [n, p]
-  step - step size for Newton-Raphson updates
+  max_iters - maximum number of updates to loadings/factors
+  atol - threshold for change in loss (convergence criterion)
+  verbose - print loss function updates
+  seed - random seed (initialization)
 
   """
   n, p = x.shape
@@ -50,12 +113,9 @@ def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, step=1, atol=1e-8,
     print(f'wglmpca [0]: {obj}')
   for i in range(max_iters):
     for k in range(rank):
-      l[:,k] += step * (w * (x - lam)) @ f[:,k] / ((w * lam) @ np.square(f[:,k]))
-      lam = np.exp(l @ f.T)
+      l[:,k], update = _update_l_k(l, f, k, x, w) 
     for k in range(rank):
-      f[:,k] += step * (w * (x - lam)).T @ l[:,k] / ((w.T * lam.T) @ np.square(l[:,k]))
-      lam = np.exp(l @ f.T)
-    update = _pois_loss(x, lam, w=w)
+      f[:,k], update = _update_f_k(l, f, k, x, w) 
     if verbose:
       print(f'wglmpca [{i + 1}]: {update}')
     if update > obj:
