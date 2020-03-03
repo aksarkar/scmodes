@@ -74,7 +74,7 @@ def _update_f_k(l, f, k, x, w, step=1, c=0.5, tau=0.5, max_iters=30):
   else:
     return f[:,k] + step * d, update
 
-def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, atol=1e-8, verbose=False, seed=None):
+def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, tol=1e-8, verbose=False, seed=None):
   """Return loadings and factors of a log-linear factor model
 
   x - array-like [n, p]
@@ -83,7 +83,7 @@ def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, atol=1e-8, verbose
   init - (l [n, rank], f [p, rank])
   w - array-like [n, p]
   max_iters - maximum number of updates to loadings/factors
-  atol - threshold for change in loss (convergence criterion)
+  tol - threshold for change in loss (convergence criterion)
   verbose - print loss function updates
   seed - random seed (initialization)
 
@@ -122,7 +122,7 @@ def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, atol=1e-8, verbose
       # Important: this can mean the initialization was bad and the update blew
       # up
       raise RuntimeError('objective increased')
-    elif obj - update < atol:
+    elif obj - update < tol:
       return l, f, update
     else:
       obj = update
