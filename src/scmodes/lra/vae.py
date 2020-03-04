@@ -123,16 +123,20 @@ class PVAE(torch.nn.Module):
     loss = -torch.sum(error - kl)
     return loss
 
-  def fit(self, x, max_epochs, w=None, n_samples=10, trace=False, verbose=False, **kwargs):
+  def fit(self, x, max_epochs, w=None, y=None, n_samples=10, trace=False, verbose=False, **kwargs):
     """Fit the model
 
-    :param x: torch.tensor [n_cells, n_genes]
+    :param x: training data torch.tensor [n_cells, n_genes]
+    :param y: test data torch.tensor [n_cells, n_genes]
     :param w: torch.tensor [n_cells, n_genes]
     :param kwargs: arguments to torch.optim.RMSprop
 
     """
     if w is None:
       w = torch.tensor([[1]], dtype=torch.float)
+    if y is not None:
+      wy = torch.tensor([[1]], dtype=torch.float)
+    ly = torch.zeros(1)
     if trace:
       self.trace = []
     if torch.cuda.is_available():
@@ -140,6 +144,9 @@ class PVAE(torch.nn.Module):
       self.cuda()
       x = x.cuda()
       w = w.cuda()
+      if y is not None:
+        y = y.cuda()
+        wy = wy.cuda()
     n_samples = torch.Size([n_samples])
     opt = torch.optim.RMSprop(self.parameters(), **kwargs)
     for epoch in range(max_epochs):
@@ -149,10 +156,14 @@ class PVAE(torch.nn.Module):
         raise RuntimeError('nan loss')
       loss.backward()
       opt.step()
+      if y is not None:
+        test_loss = self.loss(y, w=wy, n_samples=n_samples)
+      else:
+        test_loss = ly
       if verbose and not epoch % 10:
-        print(f'[epoch={epoch}] elbo={-loss}')
+        print(f'[epoch={epoch}] train_elbo={-loss}, test_elbo={-test_loss}')
       if trace:
-        self.trace.append(loss.detach().cpu().numpy())
+        self.trace.append([loss.detach().cpu().numpy(), test_loss.detach().cpu().numpy()])
     return self
 
   @torch.no_grad()

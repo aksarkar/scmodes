@@ -74,6 +74,17 @@ def test_pvae_oracle(simulate):
   l1 = st.poisson(mu=lam).logpmf(x).sum()
   assert l1 > l0
 
+def test_pvae_test_set(simulate):
+  x, eta = simulate
+  n, p = x.shape
+  latent_dim = 10
+  y = x.copy()
+  xt = torch.tensor(x, dtype=torch.float)
+  yt = torch.tensor(y, dtype=torch.float)
+  model = scmodes.lra.PVAE(p, latent_dim).fit(xt, y=yt, lr=1e-3, n_samples=10, max_epochs=100, trace=True)
+  t = np.array(model.trace)
+  assert t.shape == (100, 2)
+
 def test_wpvae(simulate):
   x, eta = simulate
   w = torch.ones(x.shape)
