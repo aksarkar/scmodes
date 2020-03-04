@@ -77,20 +77,6 @@ def training_score_wglmpca(x, n_components=10, max_restarts=1, max_iters=5000, *
   # Important: scmodes.lra.glmpca return total, we want mean
   return -opt / (n * p)
 
-def training_score_scvi(x, n_components=10, **kwargs):
-  from scvi.dataset import GeneExpressionDataset
-  from scvi.inference import UnsupervisedTrainer
-  from scvi.models import VAE
-  data = GeneExpressionDataset(*GeneExpressionDataset.get_attributes_from_matrix(x.values))
-  vae = VAE(n_input=x.shape[1])
-  m = UnsupervisedTrainer(vae, data, verbose=False)
-  m.train(n_epochs=100)
-  # Training permuted the data for minibatching. Unpermute before "imputing"
-  # (estimating lambda)
-  lam = np.vstack([m.train_set.sequential().imputation(),
-                   m.test_set.sequential().imputation()])
-  return st.poisson(mu=lam).logpmf(x).mean()
-
 def pois_llik(lam, train, test):
   if ss.issparse(train):
     raise NotImplementedError
@@ -153,20 +139,6 @@ def generalization_score_wglmpca(train, test, n_components=10, max_restarts=1, m
     return np.nan
   else:
     return pois_llik(np.exp(l.dot(f.T)), train, test)
-
-def generalization_score_scvi(train, test, n_components=10, **kwargs):
-  from scvi.dataset import GeneExpressionDataset
-  from scvi.inference import UnsupervisedTrainer
-  from scvi.models import VAE
-  data = GeneExpressionDataset(*GeneExpressionDataset.get_attributes_from_matrix(train.values))
-  vae = VAE(n_input=train.shape[1])
-  m = UnsupervisedTrainer(vae, data, verbose=False)
-  m.train(n_epochs=100)
-  # Training permuted the data for minibatching. Unpermute before "imputing"
-  # (estimating lambda)
-  lam = np.vstack([m.train_set.sequential().imputation(),
-                   m.test_set.sequential().imputation()])
-  return pois_llik(lam, train, test)
 
 def evaluate_lra_generalization(x, methods, n_trials=1, **kwargs):
   result = collections.defaultdict(list)
