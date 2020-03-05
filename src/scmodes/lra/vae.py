@@ -140,17 +140,21 @@ class PVAE(torch.nn.Module):
       if not 0 < test_size < 1:
         raise ValueError(f'Test size must be between 0 and 1 (got {test_size:.1f})')
       n_test = int(test_size * x.shape[0])
-      y = x[-n_test:]
+      y = x[:n_test]
+      x = x[n_test:]
     else:
       y = None
-    if w is None:
-      w = torch.tensor([[1]], dtype=torch.float)
-    if y is not None:
-      if w.shape == x.shape:
-        wy = w[-n_test:]
+    if test_size is not None:
+      if w is not None:
+        wy = w[:n_test]
+        w = w[n_test:]
       else:
+        w = torch.tensor([[1]], dtype=torch.float)
         wy = w
-    ly = torch.zeros(1)
+    else:
+      if w is None:
+        w = torch.tensor([[1]], dtype=torch.float)
+      ly = torch.zeros(1)
     if trace:
       self.trace = []
     if torch.cuda.is_available():
