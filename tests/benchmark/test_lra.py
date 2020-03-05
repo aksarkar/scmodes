@@ -9,7 +9,7 @@ from .fixtures import *
 
 def test_training_score_nmf(simulate):
   x, eta = simulate
-  res = scmodes.benchmark.training_score_nmf(x, n_components=10)
+  res = scmodes.benchmark.training_score_nmf(pd.DataFrame(x), n_components=10)
   assert np.isfinite(res)
   assert res <= 0
 
@@ -22,12 +22,6 @@ def test_training_score_glmpca(simulate):
 def test_training_score_pvae(simulate):
   x, eta = simulate
   res = scmodes.benchmark.training_score_pvae(pd.DataFrame(x), n_components=10)
-  assert np.isfinite(res)
-  assert res <= 0
-
-def test_training_score_wglmpca(simulate):
-  x, eta = simulate
-  res = scmodes.benchmark.training_score_wglmpca(pd.DataFrame(x), n_components=1)
   assert np.isfinite(res)
   assert res <= 0
 
@@ -95,12 +89,6 @@ def test_generalization_score_glmpca(simulate_train_test):
 def test_generalization_score_pvae(simulate_train_test):
   train, test, eta = simulate_train_test
   res = scmodes.benchmark.generalization_score_pvae(train, test, n_components=10)
-  assert np.isfinite(res)
-  assert res < 0
-
-def test_generalization_score_wglmpca(simulate_train_test):
-  train, test, eta = simulate_train_test
-  res = scmodes.benchmark.generalization_score_wglmpca(train, test, n_components=1)
   assert np.isfinite(res)
   assert res < 0
 

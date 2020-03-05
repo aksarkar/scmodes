@@ -1,81 +1,29 @@
 import collections
 import numpy as np
 import pandas as pd
-import rpy2.robjects.numpy2ri
-import rpy2.robjects.packages
-import rpy2.robjects.pandas2ri
 import scipy.sparse as ss
 import scipy.stats as st
 import scmodes
-import sklearn.decomposition as skd
 import torch
-import wlra
-import wlra.vae
 
-rpy2.robjects.numpy2ri.activate()
-rpy2.robjects.pandas2ri.activate()
-glmpca = rpy2.robjects.packages.importr('glmpca')
+def training_score_nmf(x, n_components=10, tol=1e-4, max_iters=100000, **kwargs):
+  l, f, _ = scmodes.lra.nmf(x.values, rank=n_components, tol=tol, max_iters=max_iters)
+  lam = l @ f.T
+  return st.poisson(mu=lam).logpmf(x).mean()
 
-def training_score_nmf(x, n_components=10, **kwargs):
-  m = skd.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(x)
-  return st.poisson(mu=m.transform(x).dot(m.components_)).logpmf(x).mean()
+def training_score_glmpca(x, n_components=10, tol=1e-4, max_iters=100000, **kwargs):
+  l, f, _ = scmodes.lra.glmpca(x.values, rank=n_components, tol=tol, max_iters=max_iters)
+  lam = np.exp(l @ f.T)
+  return st.poisson(mu=lam).logpmf(x).mean()
 
-def _glmpca(x, n_components, max_restarts, penalty=0):
-  # GLMPCA can fail for some (random) initializations, so restart to find one
-  # which works
-  obj = None
-  for i in range(max_restarts):
-    try:
-      # We use samples x genes, but GLM-PCA expects genes x samples
-      res = glmpca.glmpca(x.values.T,
-                          L=n_components,
-                          fam='poi',
-                          penalty=penalty,
-                          ctl=rpy2.robjects.vectors.ListVector({'maxIter': 1000, 'eps': 1e-15}))
-      L = pd.DataFrame(res.rx2('loadings')).values
-      F = pd.DataFrame(res.rx2('factors')).values
-      lam = np.exp(F @ L.T)
-      llik = st.poisson(mu=lam).logpmf(x.values).mean()
-      print(f'glmpca {i} {llik:.3g}')
-      if obj is None or llik > obj:
-        obj = llik
-    except Exception as e:
-      print(f'glmpca {i} failed: {e.__cause__}')
-      continue
-  if obj is None:
-    L = None
-    F = None
-    obj = np.nan
-  # Important: return loadings (n, k) and factors (p, k)
-  return F, L, obj
-
-def training_score_glmpca(x, n_components=10, max_restarts=1, penalty=0, **kwargs):
-  res = _glmpca(x, n_components=n_components, max_restarts=max_restarts, penalty=penalty)
-  return res[-1]
-
-def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=2000, **kwargs):
+def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=200, **kwargs):
   n, p = x.shape
   s = x.values.sum(axis=1, keepdims=True)
   x = torch.tensor(x.values, dtype=torch.float)
-  s = torch.tensor(s, dtype=torch.float)
-  m = (wlra.vae.PVAE(p, n_components)
-       .fit(x, s, lr=lr, max_epochs=max_epochs))
-  lam = m.denoise(x)
+  m = (scmodes.lra.PVAE(p, n_components)
+       .fit(x, lr=lr, max_epochs=max_epochs))
+  lam = m.denoise(x, n_samples=100)
   return st.poisson(mu=lam).logpmf(x).mean()
-
-def training_score_wglmpca(x, n_components=10, max_restarts=1, max_iters=5000, **kwargs):
-  n, p = x.shape
-  opt = np.inf
-  for i in range(max_restarts):
-    try:
-      # Important: x is assumed to be pd.DataFrame
-      l, f, loss = scmodes.lra.glmpca(x.values, rank=n_components, max_iters=max_iters)
-    except RuntimeError:
-      continue
-    if loss < opt:
-      opt = loss
-  # Important: scmodes.lra.glmpca return total, we want mean
-  return -opt / (n * p)
 
 def pois_llik(lam, train, test):
   if ss.issparse(train):
@@ -104,41 +52,22 @@ def train_test_split(x, p=0.5):
   test = x - train
   return train, test
 
-def generalization_score_nmf(train, test, n_components=10, **kwargs):
-  m = skd.NMF(n_components=n_components, solver='mu', beta_loss=1).fit(train)
-  return pois_llik(m.transform(train).dot(m.components_), train, test)
+def generalization_score_nmf(train, test, n_components=10, tol=1e-4, max_iters=100000, **kwargs):
+  l, f, _ = scmodes.lra.nmf(train.values, rank=n_components, tol=tol, max_iters=max_iters)
+  lam = l @ f.T
+  return pois_llik(lam, train, test)
 
-def generalization_score_glmpca(train, test, n_components=10, max_restarts=1, **kwargs):
-  L, F, llik = _glmpca(train, n_components, max_restarts)
-  if np.isnan(llik):
-    return np.nan
-  else:
-    return pois_llik(np.exp(L @ F.T), train, test)
+def generalization_score_glmpca(train, test, n_components=10, tol=1e-4, max_iters=100000, **kwargs):
+  l, f, _ = scmodes.lra.glmpca(train.values, rank=n_components, tol=tol, max_iters=max_iters)
+  lam = np.exp(l @ f.T)
+  return pois_llik(lam, train, test)
 
-def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=2000, **kwargs):
+def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=200, **kwargs):
   n, p = train.shape
-  s = train.values.sum(axis=1, keepdims=True)
   x = torch.tensor(train.values, dtype=torch.float)
-  s = torch.tensor(s, dtype=torch.float)
-  m = (wlra.vae.PVAE(p, n_components)
-       .fit(x, s, lr=lr, max_epochs=max_epochs))
+  m = (scmodes.lra.PVAE(p, n_components)
+       .fit(x, lr=lr, max_epochs=max_epochs))
   return pois_llik(m.denoise(x), train, test)
-
-def generalization_score_wglmpca(train, test, n_components=10, max_restarts=1, max_iters=5000, **kwargs):
-  opt = None
-  obj = np.inf
-  for i in range(max_restarts):
-    try:
-      l, f, loss = scmodes.lra.glmpca(train.values, rank=n_components, max_iters=max_iters)
-    except RuntimeError:
-      continue
-    if loss < obj:
-      opt = l, f
-      obj = loss
-  if opt is None:
-    return np.nan
-  else:
-    return pois_llik(np.exp(l.dot(f.T)), train, test)
 
 def evaluate_lra_generalization(x, methods, n_trials=1, **kwargs):
   result = collections.defaultdict(list)
