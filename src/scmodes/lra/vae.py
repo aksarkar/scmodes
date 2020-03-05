@@ -123,19 +123,33 @@ class PVAE(torch.nn.Module):
     loss = -torch.sum(error - kl)
     return loss
 
-  def fit(self, x, max_epochs, w=None, y=None, n_samples=10, trace=False, verbose=False, **kwargs):
+  def fit(self, x, max_epochs, w=None, test_size=None, n_samples=10, trace=False, verbose=False, **kwargs):
     """Fit the model
 
-    :param x: training data torch.tensor [n_cells, n_genes]
-    :param y: test data torch.tensor [n_cells, n_genes]
-    :param w: torch.tensor [n_cells, n_genes]
-    :param kwargs: arguments to torch.optim.RMSprop
+    x - training data torch.tensor [n_cells, n_genes]
+    max_epochs - number of epochs
+    test_size - proportion of data to hold out for monitoring (default: 0)
+    n_samples - number of samples used in estimating stochastic gradients
+    trace - if True, record training/test losses
+    verbose - if True, report training/test losses
+    w - torch.tensor [n_cells, n_genes]
+    kwarsg - arguments to torch.optim.RMSprop
 
     """
+    if test_size is not None:
+      if not 0 < test_size < 1:
+        raise ValueError(f'Test size must be between 0 and 1 (got {test_size:.1f})')
+      n_test = int(test_size * x.shape[0])
+      y = x[-n_test:]
+    else:
+      y = None
     if w is None:
       w = torch.tensor([[1]], dtype=torch.float)
     if y is not None:
-      wy = torch.tensor([[1]], dtype=torch.float)
+      if w.shape == x.shape:
+        wy = w[-n_test:]
+      else:
+        wy = w
     ly = torch.zeros(1)
     if trace:
       self.trace = []

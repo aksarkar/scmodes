@@ -78,10 +78,8 @@ def test_pvae_test_set(simulate):
   x, eta = simulate
   n, p = x.shape
   latent_dim = 10
-  y = x.copy()
   xt = torch.tensor(x, dtype=torch.float)
-  yt = torch.tensor(y, dtype=torch.float)
-  model = scmodes.lra.PVAE(p, latent_dim).fit(xt, y=yt, lr=1e-3, n_samples=10, max_epochs=100, trace=True)
+  model = scmodes.lra.PVAE(p, latent_dim).fit(xt, test_size=0.1, lr=1e-3, n_samples=10, max_epochs=100, trace=True)
   t = np.array(model.trace)
   assert t.shape == (100, 2)
 
