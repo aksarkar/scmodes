@@ -7,29 +7,15 @@ import torch
 
 from .fixtures import *
 
-def test_training_score_nmf(simulate):
-  x, eta = simulate
-  res = scmodes.benchmark.training_score_nmf(pd.DataFrame(x), n_components=10)
-  assert np.isfinite(res)
-  assert res <= 0
-
-def test_training_score_glmpca(simulate):
-  x, eta = simulate
-  res = scmodes.benchmark.training_score_glmpca(pd.DataFrame(x), n_components=10)
-  assert np.isfinite(res)
-  assert res <= 0
-
-def test_training_score_pvae(simulate):
-  x, eta = simulate
-  res = scmodes.benchmark.training_score_pvae(pd.DataFrame(x), n_components=10)
-  assert np.isfinite(res)
-  assert res <= 0
-
 def test_pois_llik(simulate_train_test):
   train, test, eta = simulate_train_test
-  res = scmodes.benchmark.pois_llik(np.exp(eta), train, test)
-  assert np.isscalar(res)
-  assert res < 0
+  train_llik, test_llik = scmodes.benchmark.pois_llik(np.exp(eta), train, test)
+  assert np.isscalar(train_llik)
+  assert np.isscalar(test_llik)
+  assert np.isfinite(train_llik)
+  assert np.isfinite(test_llik)
+  assert train_llik < 0
+  assert test_llik < 0
 
 @pytest.mark.xfail(reason='Not implemented')
 def test_pois_llik_sparse(simulate_train_test):
@@ -75,26 +61,39 @@ def test_train_test_split_sparse_csc(simulate_holdout):
 
 def test_generalization_score_nmf(simulate_train_test):
   train, test, eta = simulate_train_test
-  res = scmodes.benchmark.generalization_score_nmf(train, test, n_components=10)
-  assert np.isfinite(res)
-  assert res < 0
+  train_llik, test_llik = scmodes.benchmark.generalization_score_nmf(train, test, n_components=1)
+  assert np.isscalar(train_llik)
+  assert np.isscalar(test_llik)
+  assert np.isfinite(train_llik)
+  assert np.isfinite(test_llik)
+  assert train_llik < 0
+  assert test_llik < 0
 
 def test_generalization_score_glmpca(simulate_train_test):
   train, test, eta = simulate_train_test
   np.random.seed(1)
-  res = scmodes.benchmark.generalization_score_glmpca(train, test, n_components=1)
-  assert np.isfinite(res)
-  assert res < 0
+  train_llik, test_llik = scmodes.benchmark.generalization_score_glmpca(train, test, n_components=1)
+  assert np.isscalar(train_llik)
+  assert np.isscalar(test_llik)
+  assert np.isfinite(train_llik)
+  assert np.isfinite(test_llik)
+  assert train_llik < 0
+  assert test_llik < 0
 
 def test_generalization_score_pvae(simulate_train_test):
   train, test, eta = simulate_train_test
-  res = scmodes.benchmark.generalization_score_pvae(train, test, n_components=10)
-  assert np.isfinite(res)
-  assert res < 0
+  train_llik, test_llik = scmodes.benchmark.generalization_score_pvae(train, test, n_components=1)
+  assert np.isscalar(train_llik)
+  assert np.isscalar(test_llik)
+  assert np.isfinite(train_llik)
+  assert np.isfinite(test_llik)
+  assert train_llik < 0
+  assert test_llik < 0
 
 def test_evaluate_lra_generalization(simulate):
   x, eta = simulate
   x = pd.DataFrame(x)
-  res = scmodes.benchmark.evaluate_lra_generalization(x, methods=['nmf'])
+  res = scmodes.benchmark.evaluate_lra_generalization(x, methods=['nmf'], n_components=1)
   assert not res.empty
   assert np.isfinite(res.values).all()
+  assert res.shape == (1, 2)

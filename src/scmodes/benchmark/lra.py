@@ -6,35 +6,16 @@ import scipy.stats as st
 import scmodes
 import torch
 
-def training_score_nmf(x, n_components=10, tol=1e-4, max_iters=100000, **kwargs):
-  l, f, _ = scmodes.lra.nmf(x.values, rank=n_components, tol=tol, max_iters=max_iters)
-  lam = l @ f.T
-  return st.poisson(mu=lam).logpmf(x).mean()
-
-def training_score_glmpca(x, n_components=10, tol=1e-4, max_iters=100000, **kwargs):
-  l, f, _ = scmodes.lra.glmpca(x.values, rank=n_components, tol=tol, max_iters=max_iters)
-  lam = np.exp(l @ f.T)
-  return st.poisson(mu=lam).logpmf(x).mean()
-
-def training_score_pvae(x, n_components=10, lr=1e-3, max_epochs=200, **kwargs):
-  n, p = x.shape
-  s = x.values.sum(axis=1, keepdims=True)
-  x = torch.tensor(x.values, dtype=torch.float)
-  m = (scmodes.lra.PVAE(p, n_components)
-       .fit(x, lr=lr, max_epochs=max_epochs))
-  lam = m.denoise(x, n_samples=100)
-  return st.poisson(mu=lam).logpmf(x).mean()
-
 def pois_llik(lam, train, test):
   if ss.issparse(train):
     raise NotImplementedError
   elif isinstance(train, pd.DataFrame):
     assert isinstance(lam, np.ndarray)
     assert isinstance(test, pd.DataFrame)
-    lam *= test.values.sum(axis=1, keepdims=True) / train.values.sum(axis=1, keepdims=True)
+    s = test.values.sum(axis=1, keepdims=True) / train.values.sum(axis=1, keepdims=True)
   else:
-    lam *= test.sum(axis=1, keepdims=True) / train.sum(axis=1, keepdims=True)
-  return st.poisson(mu=lam).logpmf(test).mean()
+    s = test.sum(axis=1, keepdims=True) / train.sum(axis=1, keepdims=True)
+  return st.poisson(mu=lam).logpmf(train).mean(), np.ma.masked_invalid(st.poisson(mu=s * lam).logpmf(test)).mean()
 
 def train_test_split(x, p=0.5):
   if ss.issparse(x):
@@ -76,10 +57,9 @@ def evaluate_lra_generalization(x, methods, n_trials=1, **kwargs):
     result[('validation', method)] = []
     for trial in range(n_trials):
       train, val = scmodes.benchmark.train_test_split(x)
-      training_score = getattr(scmodes.benchmark, f'training_score_{method}')(train, **kwargs)
-      result[('train', method)].append(training_score)
-      validation_score = getattr(scmodes.benchmark, f'generalization_score_{method}')(train, val, **kwargs)
-      result[('validation', method)].append(validation_score)
+      train_score, val_score = getattr(scmodes.benchmark, f'generalization_score_{method}')(train, val, **kwargs)
+      result[('train', method)].append(train_score)
+      result[('validation', method)].append(val_score)
   result = pd.DataFrame.from_dict(result)
   result.index.name = 'trial'
   return result
