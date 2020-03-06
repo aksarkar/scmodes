@@ -118,7 +118,7 @@ def nbmf(x, rank, inv_disp, init=None, w=None, max_iters=1000, tol=1, fix_inv_di
     if verbose:
       print(f'nbmf [{i + 1}]: {update} {inv_disp}')
     if obj - update <= tol:
-      return l, f, update
+      return l, f, inv_disp, update
     else:
       obj = update
   raise RuntimeError('failed to converge')
