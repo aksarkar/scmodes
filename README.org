@@ -3,8 +3,8 @@
   This repository (and accompanying repository singlecell-modes) contains code
   accompanying the manuscript:
 
-  Sarkar, AK and Stephens, M. "Common pitfalls in the analysis of scRNA-seq
-  data".
+  Sarkar, AK and Stephens, M. "A general statistical framework clarifies
+  confusion in analysis of scRNA-seq data".
 
   To install the package:
 
