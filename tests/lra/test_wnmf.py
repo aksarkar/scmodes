@@ -12,7 +12,7 @@ def test__frob_loss():
   n = 100
   p = 200
   x = np.random.normal(size=(n, p))
-  assert np.isclose(scmodes.lra.wnmf._frob_loss(x, 0), np.square(np.linalg.norm(x)))
+  assert np.isclose(scmodes.lra.wnmf._frob_loss(x, 0, w=1), np.square(np.linalg.norm(x)))
 
 def test__frob_loss_weight():
   np.random.seed(0)
@@ -26,7 +26,7 @@ def test__frob_loss_weight():
 def test__pois_loss(simulate_lam_rank1):
   x, lam = simulate_lam_rank1
   oracle_llik = st.poisson(mu=lam).logpmf(x).sum()
-  loss = scmodes.lra.wnmf._pois_loss(x, lam)
+  loss = scmodes.lra.wnmf._pois_loss(x, lam, w=1)
   assert np.isclose(-loss, oracle_llik)
 
 def test__pois_loss_weight(simulate_lam_rank1):

@@ -74,39 +74,23 @@ def _update_f_k(l, f, k, x, w, step=1, c=0.5, tau=0.5, max_iters=30):
   else:
     return f[:,k] + step * d, update
 
-def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, tol=1e-8, verbose=False, seed=None):
+def glmpca(x, rank, w=None, tol=1e-4, max_iters=10000, verbose=False):
   """Return loadings and factors of a log-linear factor model
 
   x - array-like [n, p]
   rank - scalar
-  s - size factor [n, 1]
-  init - (l [n, rank], f [p, rank])
   w - array-like [n, p]
   max_iters - maximum number of updates to loadings/factors
   tol - threshold for change in loss (convergence criterion)
-  verbose - print loss function updates
-  seed - random seed (initialization)
+  verbose - report likelihood after each update
 
   """
   n, p = x.shape
-  if s is None:
-    s = x.sum(axis=1).reshape(-1, 1)
-  else:
-    assert s.shape == (n, 1)
   if w is None:
     # Important: this needs to be compatible with matrix multiplication
     w = np.array(1)
-  if seed is not None:
-    np.random.seed(seed)
-  if init is None:
-    # TODO: if this is too close to zero, the update can explode
-    l = np.random.normal(size=(n, rank))
-    f = np.random.normal(size=(p, rank))
-  else:
-    l, f = init
-    assert l.shape == (n, rank)
-    assert f.shape == (p, rank)
-  # TODO: this can have severe numerical problems
+  l = np.random.normal(size=(n, rank))
+  f = np.random.normal(size=(p, rank))
   lam = np.exp(l @ f.T)
   obj = _pois_loss(x, lam, w=w)
   if verbose:
@@ -118,11 +102,10 @@ def glmpca(x, rank, s=None, init=None, w=None, max_iters=100, tol=1e-8, verbose=
       f[:,k], update = _update_f_k(l, f, k, x, w) 
     if verbose:
       print(f'wglmpca [{i + 1}]: {update}')
-    if update > obj:
-      # Important: this can mean the initialization was bad and the update blew
-      # up
-      raise RuntimeError('objective increased')
-    elif obj - update < tol:
+    # Monotonicity should be guaranteed by line search, which solves the
+    # numerical instability problem in the original implementation
+    assert update <= obj
+    if obj - update < tol:
       return l, f, update
     else:
       obj = update

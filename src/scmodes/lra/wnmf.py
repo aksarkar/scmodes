@@ -25,16 +25,14 @@ def _safe_log(x):
   """Numerically safe log"""
   return np.log(x + 1e-8)
 
-def _frob_loss(x, lf, w=None):
+def _frob_loss(x, lf, w):
   """Return the (weighted) squared Frobenius norm \\sum_{ij} w_{ij} (x_{ij} -
   (LF)_{ij})^2
 
   """
-  if w is None:
-    w = 1
   return (w * np.square(x - lf)).sum()  
 
-def _pois_loss(x, lam, w=None):
+def _pois_loss(x, lam, w):
   """Return the (weighted) Poisson negative log likelihood
 
   x_ij ~ Pois([LF]_ij).
@@ -42,23 +40,27 @@ def _pois_loss(x, lam, w=None):
   Weights are assume to be binary, denoting presence/absence.
 
   """
-  if w is None:
-    w = 1
   return -(w * (x * _safe_log(lam) - lam - sp.gammaln(x + 1))).sum()
 
-def nmf(x, rank, w=None, pois_loss=True, max_iters=1000, tol=1, eps=1e-10, verbose=False):
+def nmf(x, rank, w=None, pois_loss=True, tol=1e-4, max_iters=10000, eps=1e-10, verbose=False):
   """Return non-negative loadings and factors (Lee and Seung 2001).
 
   Returns loadings [n, rank] and factors [p, rank]
 
   x - array-like [n, p]
-  frob - fit Gaussian model
+  w - array-like [n, p]
+  pois_loss - if True, fit Poisson NMF; otherwise, fit Gaussian NMF
   tol - threshold for change in log likelihood (convergence criterion)
+  max_iters - maximum number of EM updates
+  eps - pseudocount (prevent division by zero)
+  verbose - report likelihood after each update
 
   """
   if w is None:
     # Important: this simplifies the implementation, but is costly
     w = np.ones(x.shape)
+  elif w.shape != x.shape:
+    raise ValueError('w must be same shape as x')
   n, p = x.shape
   # Random initialization (c.f. https://github.com/scikit-learn/scikit-learn/blob/bac89c2/sklearn/decomposition/nmf.py#L315)
   scale = np.sqrt(x.mean() / rank)
