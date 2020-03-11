@@ -1,15 +1,29 @@
 * Investigation of single cell modes
 
-  This repository (and accompanying repository singlecell-modes) contains code
-  accompanying the manuscript:
+  This repository (and accompanying repository
+  [[https://www.github.com/aksarkar/singlecell-modes][singlecell-modes]])
+  contains code accompanying the manuscript:
 
   Sarkar, AK and Stephens, M. "A general statistical framework clarifies
   confusion in analysis of scRNA-seq data".
 
-  To install the package:
+  To install the package under conda:
+
+  #+BEGIN_SRC sh
+    conda install -c aksarkar scmodes
+  #+END_SRC
+
+  To install the package under pip:
 
   #+BEGIN_SRC sh
     pip install git+https://www.github.com/aksarkar/scmodes.git#egg=scmodes
   #+END_SRC
 
-  
+  The package includes optional dependencies on the R packages
+  [[https://www.github.com/stephens999/ashr.git][ashr]] and
+  [[https://github.com/jingshuw/descend][DESCEND]]. We have provided conda
+  packages:
+
+  #+BEGIN_SRC sh
+    conda install -c aksarkar r-ashr r-descend
+  #+END_SRC
