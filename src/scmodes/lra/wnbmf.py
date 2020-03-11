@@ -17,7 +17,7 @@ import scipy.optimize as so
 import scipy.special as sp
 import scipy.stats as st
 
-def _nbmf_loss(x, lam, inv_disp, w=None):
+def _nbmf_loss(x, lam, inv_disp, w):
   """Return the (weighted) negative log likelihood
 
   x - array-like [n, p]
@@ -26,10 +26,11 @@ def _nbmf_loss(x, lam, inv_disp, w=None):
   w - array-like [n, p]
 
   """
-  if w is None:
-    w = 1
-  # Important: scipy.stats parameterizes p(k | n, p) ∝ p^n (1 - p)^k
-  return -np.where(w, st.nbinom(n=inv_disp, p=1 / (1 + lam / inv_disp)).logpmf(x), 0).sum()
+  if inv_disp > 1e4:
+    return -np.where(w, st.poisson(mu=lam).logpmf(x), 0).sum()
+  else:
+    # Important: scipy.stats parameterizes p(k | n, p) ∝ p^n (1 - p)^k
+    return -np.where(w, st.nbinom(n=inv_disp, p=1 / (1 + lam / inv_disp)).logpmf(x), 0).sum()
 
 def _D_loss_theta(theta, u, log_u, w):
   """Return the partial derivative of the expected log joint with respect to

@@ -13,9 +13,6 @@ import sys
 
 rpy2.robjects.pandas2ri.activate()
 
-ashr = rpy2.robjects.packages.importr('ashr')
-descend = rpy2.robjects.packages.importr('descend')
-
 def _gof(x, cdf, pmf, **kwargs):
   """Test for goodness of fit x_i ~ \\hat{F}(.)
 
@@ -214,11 +211,13 @@ def _ash_cdf(x, fit, s, thresh=1e-8):
 
 def _ash_pmf(x, fit, **kwargs):
   """Compute marginal PMF of the data"""
+  ashr = rpy2.robjects.packages.importr('ashr')
   # Important: use fit$data, not x
   return np.array(fit.rx2('fitted_g').rx2('pi')).dot(np.array(ashr.comp_dens_conv(fit.rx2('fitted_g'), fit.rx2('data'))))
 
 def _gof_unimodal(k, x, size):
   """Helper function to fit one gene"""
+  ashr = rpy2.robjects.packages.importr('ashr')
   lam = x / size
   if np.isclose(lam.min(), lam.max()):
     # No variation

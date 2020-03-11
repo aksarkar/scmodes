@@ -1,20 +1,14 @@
 import functools as ft
 import numpy as np
 import pandas as pd
-import scipy.stats as st
+import rpy2.robjects.packages
+import rpy2.robjects.pandas2ri
 import scipy.special as sp
+import scipy.stats as st
 import sklearn.model_selection as skms
 import sys
 
-import rpy2.robjects.packages
-import rpy2.robjects.pandas2ri
-import rpy2.robjects.numpy2ri
-
 rpy2.robjects.pandas2ri.activate()
-rpy2.robjects.numpy2ri.activate()
-
-ashr = rpy2.robjects.packages.importr('ashr')
-descend = rpy2.robjects.packages.importr('descend')
 
 def nb_llik(x, mean, inv_disp):
   return (x * np.log(mean / inv_disp) -
@@ -72,6 +66,7 @@ def score_point_gamma(x_train, x_test, **kwargs):
   return zinb_llik(x_test, x_test.sum(axis=1, keepdims=True) * np.exp(log_mu), np.exp(-log_phi), logodds).sum(axis=0)
 
 def _score_unimodal(train, test, train_size_factor, test_size_factor):
+  ashr = rpy2.robjects.packages.importr('ashr')
   lam = train / train_size_factor
   if np.isclose(lam.min(), lam.max()):
     # No variation
@@ -105,6 +100,7 @@ def score_unimodal(x_train, x_test, pool, **kwargs):
   return np.array(result).ravel()
 
 def _score_zief(train, test, train_size_factor, test_size_factor):
+  descend = rpy2.robjects.packages.importr('descend')
   try:
     res = descend.deconvSingle(pd.Series(train), scaling_consts=train_size_factor, verbose=False)
   except:
@@ -137,6 +133,7 @@ def score_zief(x_train, x_test, pool, **kwargs):
   return np.array(result).ravel()
 
 def _score_npmle(train, test, train_size_factor, test_size_factor, K=100):
+  ashr = rpy2.robjects.packages.importr('ashr')
   lam = train / train_size_factor
   grid = np.linspace(0, lam.max(), K + 1)
   res0 = ashr.ash_workhorse(

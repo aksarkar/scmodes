@@ -10,9 +10,6 @@ import scmodes
 
 rpy2.robjects.pandas2ri.activate()
 
-ashr = rpy2.robjects.packages.importr('ashr')
-descend = rpy2.robjects.packages.importr('descend')
-
 def fit_gamma(x, s, num_points=1000):
   lam = x / s
   grid = np.linspace(lam.min(), lam.max(), num_points)
@@ -27,6 +24,7 @@ def fit_zig(x, s, num_points=1000):
   return [grid, F]
 
 def fit_unimodal(x, s, num_points=1000):
+  ashr = rpy2.robjects.packages.importr('ashr')
   lam = x / s
   grid = np.linspace(lam.min(), lam.max(), num_points)
   res = ashr.ash_pois(pd.Series(x), pd.Series(s), mixcompdist='halfuniform',
@@ -35,6 +33,7 @@ def fit_unimodal(x, s, num_points=1000):
   return [np.array(F.rx2('x')), np.array(F.rx2('y')).ravel()]
 
 def fit_zief(x, s, num_points=1000):
+  descend = rpy2.robjects.packages.importr('descend')
   lam = x / s
   grid = np.linspace(lam.min(), lam.max(), num_points)
   res = descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s), verbose=False)
@@ -45,6 +44,7 @@ def fit_zief(x, s, num_points=1000):
   return [grid, np.interp(grid, z, Fz)]
 
 def fit_npmle(x, s, num_points=1000, K=200):
+  ashr = rpy2.robjects.packages.importr('ashr')
   lam = x / s
   grid = np.linspace(0, lam.max(), K + 1)
   res = ashr.ash_workhorse(
