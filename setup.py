@@ -13,7 +13,7 @@ setuptools.setup(
     'pandas',
     'rpy2',
     'scipy',
-    'sklearn',
+    'scikit-learn',
     'torch',
   ],
   packages=setuptools.find_packages('src'),

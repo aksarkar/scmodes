@@ -22,7 +22,7 @@
   The package includes optional dependencies on the R packages
   [[https://www.github.com/stephens999/ashr.git][ashr]] and
   [[https://github.com/jingshuw/descend][DESCEND]]. We have provided conda
-  packages:
+  packages for these dependencies:
 
   #+BEGIN_SRC sh
     conda install -c aksarkar r-ashr r-descend
