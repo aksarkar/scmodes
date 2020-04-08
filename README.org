@@ -4,8 +4,10 @@
   [[https://www.github.com/aksarkar/singlecell-modes][singlecell-modes]])
   contains code accompanying the manuscript:
 
-  Sarkar, AK and Stephens, M. "A general statistical framework clarifies
-  confusion in analysis of scRNA-seq data".
+  Sarkar, AK and Stephens,
+  M. "[[https://dx.doi.org/10.1101/2020.04.07.030007][Separating measurement
+  and expression models clarifies confusion in single cell RNA-seq analysis.]]"
+  bioRxiv (2020).
 
   To install the package under conda:
 
