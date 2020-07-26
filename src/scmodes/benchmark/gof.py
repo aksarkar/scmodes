@@ -120,7 +120,7 @@ def _zig_pmf(x, size, log_mu, log_phi, logodds=None):
     pmf[x == 0] += pi0
   return pmf
 
-def _sgd_prepare(x, s, key):
+def _sgd_prepare(x, s, key, batch_size):
   if isinstance(x, pd.DataFrame):
     x_csr = ss.csr_matrix(x.values)
     genes = x.columns
@@ -140,9 +140,11 @@ def _sgd_prepare(x, s, key):
   x_csc = x_csr.tocsc()
   if s is None:
     s = x_csc.sum(axis=1).A
-  return x_csr, x_csc, s, genes
+  # Heuristic: fix the total number of updates
+  max_epochs = 6000 * batch_size // x.shape[0]
+  return x_csr, x_csc, s, genes, max_epochs
 
-def gof_gamma(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
+def gof_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
   """Fit and test for departure from Poisson-Gamma distribution for each column of x
 
   x - array-like (n, p) (can be e.g. pd.DataFrame or anndata.AnnData)
@@ -150,7 +152,7 @@ def gof_gamma(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwa
   key - if x is anndata.AnnData, column of x.var to use as key (default: first column)
 
   """
-  x_csr, x_csc, s, genes = _sgd_prepare(x, s, key)
+  x_csr, x_csc, s, genes, max_epochs = _sgd_prepare(x, s, key, batch_size)
   fit = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
   result = []
   for j, (gene, (log_mu, neg_log_phi)) in enumerate(zip(genes, np.vstack(fit[:-1]).T)):
@@ -161,7 +163,7 @@ def gof_gamma(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwa
           .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
           .set_index('gene'))
 
-def gof_zig(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwargs):
+def gof_zig(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
   """Fit and test for departure from Poisson-point-Gamma distribution for each column of x
 
   x - array-like (n, p) (can be e.g. pd.DataFrame or anndata.AnnData)
@@ -169,7 +171,7 @@ def gof_zig(x, s=None, key=None, batch_size=128, lr=1e-2, max_epochs=10, **kwarg
   key - if x is anndata.AnnData, column of x.var to use as key (default: first column)
 
   """
-  x_csr, x_csc, s, genes = _sgd_prepare(x, s, key)
+  x_csr, x_csc, s, genes, max_epochs = _sgd_prepare(x, s, key, batch_size)
   fit = scmodes.ebpm.sgd.ebpm_point_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
   result = []
   for j, (gene, (log_mu, neg_log_phi, logodds)) in enumerate(zip(genes, np.vstack(fit[:-1]).T)):
