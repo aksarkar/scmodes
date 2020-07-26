@@ -133,7 +133,7 @@ class PVAE(torch.nn.Module):
     trace - if True, record training/test losses
     verbose - if True, report training/test losses
     w - torch.tensor [n_cells, n_genes]
-    kwarsg - arguments to torch.optim.RMSprop
+    kwargs - arguments to torch.optim.RMSprop
 
     """
     if test_size is not None:
@@ -237,8 +237,8 @@ class NBVAE(PVAE):
     if torch.cuda.is_available():
       x = x.cuda()
     mu = self.predict(x, n_samples, return_cpu=not torch.cuda.is_available(), return_numpy=False)
-    # Expected posterior mean
-    lam = (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
+    # E[lam | g] = E_z[E[lam | z, g]]
+    lam = (x + torch.exp(self.log_inv_disp)) / (torch.exp(self.log_inv_disp) / mu + 1)
     if torch.cuda.is_available():
       lam = lam.cpu()
     return lam.numpy()
@@ -267,8 +267,8 @@ class ZINBVAE(NBVAE):
     if torch.cuda.is_available():
       x = x.cuda()
     mu = self.predict(x, n_samples, return_cpu=not torch.cuda.is_available(), return_numpy=False)
-    # Expected posterior mean
-    lam = torch.sigmoid(-self.logodds) * (x + torch.exp(self.log_inv_disp)) / (mu + torch.exp(self.log_inv_disp))
+    # E[lam | g] = E_z[E[lam | z, g]]
+    lam = torch.sigmoid(-self.logodds) * (x + torch.exp(self.log_inv_disp)) / (torch.exp(self.log_inv_disp) / mu + 1)
     if torch.cuda.is_available():
       lam = lam.cpu()
     return lam.numpy()
