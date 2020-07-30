@@ -256,6 +256,41 @@ def test__point_expfam_cdf_pmf(test_data):
   f = scmodes.benchmark.gof._point_expfam_pmf(xj.values.ravel(), res=res, size=s)
   assert np.isclose(F - F_1, f).all()
 
+def test__gof_npmle(test_data):
+  x = test_data
+  gene = 'ENSG00000116251'
+  k, d, p = scmodes.benchmark.gof._gof_npmle(gene, x[gene], x.sum(axis=1))
+  assert k == gene
+  assert np.isfinite(d)
+  assert d >= 0
+  assert np.isfinite(p)
+  assert 0 <= p <= 1
+
+def test_gof_npmle(test_data):
+  x = test_data
+  res = scmodes.benchmark.gof_npmle(x)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
+def test_gof_npmle_size(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  res = scmodes.benchmark.gof_npmle(x, s=s)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['stat']).all()
+  assert np.isfinite(res['p']).all()
+
+def test__point_expfam_cdf(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  xj = x['ENSG00000116251']
+  res = scmodes.ebpm.ebpm_point_expfam(xj, s)
+  F = scmodes.benchmark.gof._point_expfam_cdf(xj.values.ravel(), res=res, size=s)
+  assert np.isfinite(F).all()
+  assert (F >= 0).all()
+  assert (F <= 1).all()
+
 def test_evaluate_gof(test_data):
   x = test_data
   res = scmodes.benchmark.evaluate_gof(x, methods=['gamma', 'zig'])

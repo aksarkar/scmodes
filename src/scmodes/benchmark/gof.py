@@ -226,9 +226,7 @@ def _gof_unimodal(k, x, size):
     muhat = size * x.sum() / size.sum()
     d, p = _gof(x.values.ravel(), cdf=st.poisson.cdf, pmf=st.poisson.pmf, mu=muhat)
   else:
-    res = ashr.ash_pois(x, size,
-      # Important: we need to deal with asymmetric distributions
-      mixcompdist='halfuniform')
+    res = scmodes.ebpm.ebpm_unimodal(x, size)
     d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
   return k, d, p
 
@@ -284,6 +282,59 @@ def _point_expfam_pmf(x, size, res):
   return np.where(x > 0,
                   st.poisson(mu=np.outer(size, g[1:,0])).pmf(x.reshape(-1, 1)).dot(g[1:,1]),
                   st.poisson(mu=np.outer(size, g[:,0])).pmf(x.reshape(-1, 1)).dot(g[:,1]))
+
+def _gof_npmle(k, x, size):
+  """Helper function to fit one gene"""
+  ashr = rpy2.robjects.packages.importr('ashr')
+  lam = x / size
+  if np.isclose(lam.min(), lam.max()):
+    # No variation
+    muhat = size * x.sum() / size.sum()
+    d, p = _gof(x.values.ravel(), cdf=st.poisson.cdf, pmf=st.poisson.pmf, mu=muhat)
+  else:
+    res = scmodes.ebpm.ebpm_npmle(x, size)
+    d, p = _gof(x.values.ravel(), cdf=_ash_cdf, pmf=_ash_pmf, fit=res, s=size)
+  return k, d, p
+
+def gof_npmle(x, s=None, pool=None, **kwargs):
+  """Fit and test for departure from Poisson-nonparametric distribution for each column of x
+
+  x - pd.DataFrame (n, p)
+  s - size factor (n,) (default: total molecules per sample)
+  pool - multiprocessing.Pool object
+
+  """
+  result = []
+  if s is None:
+    s = x.sum(axis=1)
+  else:
+    # Important: data must be coerced to Series to pass through rpy2
+    s = pd.Series(s)
+  f = ft.partial(_gof_npmle, size=s)
+  if pool is not None:
+    result = pool.starmap(f, x.iteritems())
+  else:
+    result = [f(*args) for args in x.iteritems()]
+  return (pd.DataFrame(result)
+          .rename(dict(enumerate(['gene', 'stat', 'p'])), axis='columns')
+          .set_index('gene'))
+
+def _point_expfam_cdf(x, res, size):
+  if tuple(res.rclass) != ('DESCEND',):
+    raise ValueError('res is not a DESCEND object')
+  n = x.shape[0]
+  assert x.shape == (n,)
+  assert size.shape == (n,)
+  g = np.array(res.slots['distribution'])[:,:2]
+  F = np.zeros(x.shape[0])
+  for i in range(x.shape[0]):
+    if x[i] < 0:
+      F[i] = 0
+    elif x[i] == 0:
+      F[i] = st.poisson(mu=size[i] * g[:,0]).pmf(x[i]).dot(g[:,1])
+    else:
+      F[i] = st.poisson(mu=size[i] * g[:,0]).pmf(np.arange(x[i] + 1).reshape(-1, 1)).dot(g[:,1]).sum()
+  return F
 
 def evaluate_gof(x, methods, **kwargs):
   result = {}
