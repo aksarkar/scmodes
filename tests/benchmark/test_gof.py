@@ -292,3 +292,18 @@ def test_evaluate_gof(test_data):
   x = test_data
   res = scmodes.benchmark.evaluate_gof(x, methods=['gamma', 'zig'])
   assert res.shape == (2 * x.shape[1], 4)
+
+def test__lr(test_data):
+  x = test_data
+  gene = 'ENSG00000116251'
+  k, llr = scmodes.benchmark.gof._lr(gene, x[gene], x.sum(axis=1))
+  assert k == gene
+  assert np.isfinite(llr)
+
+def test_evaluate_lr(test_data):
+  x = test_data
+  s = x.sum(axis=1)
+  res = scmodes.benchmark.evaluate_lr(x, s=s)
+  assert res.shape[0] == x.shape[1]
+  assert np.isfinite(res['llr']).all()
+  assert res['llr'].shape == (x.shape[1],)

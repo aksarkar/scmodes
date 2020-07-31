@@ -342,3 +342,26 @@ def evaluate_gof(x, methods, **kwargs):
     # Hack: get functions by name
     result[m] = getattr(sys.modules[__name__], f'gof_{m}')(x, **kwargs)
   return pd.concat(result).reset_index().rename({'level_0': 'method'}, axis='columns')
+
+
+def _lr(k, x, size):
+  """Helper function to fit one gene"""
+  ashr = rpy2.robjects.packages.importr('ashr')
+  lam = x / size
+  if np.isclose(lam.min(), lam.max()):
+    return k, 0
+  else:
+    res0 = scmodes.ebpm.ebpm_unimodal(x, size)
+    res1 = scmodes.ebpm.ebpm_npmle(x, size)
+    return k, np.array(res1.rx2('loglik'))[0] - np.array(res0.rx2('loglik'))[0]
+
+def evaluate_lr(x, s, pool=None):
+  result = []
+  f = ft.partial(_lr, size=s)
+  if pool is not None:
+    result = pool.starmap(f, x.iteritems())
+  else:
+    result = [f(*args) for args in x.iteritems()]
+  return (pd.DataFrame(result)
+          .rename(dict(enumerate(['gene', 'llr'])), axis='columns')
+          .set_index('gene'))
