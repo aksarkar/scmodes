@@ -11,13 +11,10 @@ import scipy.stats as st
 import scmodes
 import scmodes.benchmark.gof
 
+from .fixtures import test_data
+
 ashr = rpy2.robjects.packages.importr('ashr')
 rpy2.robjects.pandas2ri.activate()
-
-@pytest.fixture
-def test_data():
-  x = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'counts.txt.gz'), sep='\t', index_col=0)
-  return x
 
 def test__gof():
   np.random.seed(0)
