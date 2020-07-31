@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 import scmodes.benchmark.llik
 
-from .fixtures import test_data
+from .fixtures import *
 
 def test__llik_point(test_data):
   x = test_data
@@ -16,27 +16,27 @@ def test__llik_point(test_data):
   assert np.isfinite(llik)
   assert llik <= 0
 
-def test_llik_point(test_data):
-  x = test_data
+def test_llik_point(test_adata):
+  x = test_adata
   res = scmodes.benchmark.llik.llik_point(x)
   assert res.shape == (x.shape[1], 1)
-  assert (res.index == x.columns).all()
+  assert (res.index == x.var[0]).all()
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
-def test_llik_gamma(test_data):
-  x = test_data
+def test_llik_gamma(test_adata):
+  x = test_adata
   res = scmodes.benchmark.llik.llik_gamma(x)
   assert res.shape == (x.shape[1], 1)
-  assert (res.index == x.columns).all()
+  assert (res.index == x.var[0]).all()
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
-def test_llik_point_gamma(test_data):
-  x = test_data
+def test_llik_point_gamma(test_adata):
+  x = test_adata
   res = scmodes.benchmark.llik.llik_point_gamma(x)
   assert res.shape == (x.shape[1], 1)
-  assert (res.index == x.columns).all()
+  assert (res.index == x.var[0]).all()
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
@@ -51,11 +51,11 @@ def test__llik_unimodal(test_data):
   assert np.isfinite(llik)
   assert llik <= 0
 
-def test_llik_unimodal(test_data):
-  x = test_data
+def test_llik_unimodal(test_adata):
+  x = test_adata
   res = scmodes.benchmark.llik.llik_unimodal(x)
   assert res.shape == (x.shape[1], 1)
-  assert (res.index == x.columns).all()
+  assert (res.index == x.var[0]).all()
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
@@ -70,16 +70,16 @@ def test__llik_npmle(test_data):
   assert np.isfinite(llik)
   assert llik <= 0
 
-def test_llik_npmle(test_data):
-  x = test_data
+def test_llik_npmle(test_adata):
+  x = test_adata
   res = scmodes.benchmark.llik.llik_npmle(x)
   assert res.shape == (x.shape[1], 1)
-  assert (res.index == x.columns).all()
+  assert (res.index == x.var[0]).all()
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
-def test_evaluate_llik(test_data):
-  x = test_data
+def test_evaluate_llik(test_adata):
+  x = test_adata
   res = scmodes.benchmark.llik.evaluate_llik(x, methods=['point', 'gamma', 'point_gamma', 'unimodal', 'npmle'])
   assert res.shape == (5 * x.shape[1], 3)
   assert np.isfinite(res['llik']).all()

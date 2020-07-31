@@ -38,4 +38,3 @@ def test_adata():
   x = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'counts.txt.gz'), sep='\t', index_col=0)
   y = anndata.AnnData(x.values, obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
   return y
-
