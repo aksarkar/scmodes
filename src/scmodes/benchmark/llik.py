@@ -12,7 +12,7 @@ import sys
 def _llik_point(k, x, s):
   """Return marginal likelihood assuming point mass expression model for one
 gene"""
-  _, llik = scmodes.ebpm.ebpm_point(x, s)
+  _, llik = scmodes.ebpm.ebpm_point(x.A.ravel(), s)
   return k, llik
 
 def _llik_unimodal(k, x, s):
@@ -21,11 +21,11 @@ model for one gene
 
   """
   ashr = rpy2.robjects.packages.importr('ashr')
-  lam = x / s
+  lam = x.A.ravel() / s
   if np.isclose(lam.min(), lam.max()):
-    return _llik_point(k, x, s)
+    return _llik_point(k, x.A.ravel(), s)
   else:
-    res = scmodes.ebpm.ebpm_unimodal(x, s)
+    res = scmodes.ebpm.ebpm_unimodal(x.A.ravel(), s)
     return k, np.array(res.rx2('loglik'))[0]
 
 def _llik_npmle(k, x, s):
@@ -34,14 +34,14 @@ gene
 
   """
   ashr = rpy2.robjects.packages.importr('ashr')
-  lam = x / s
+  lam = x.A.ravel() / s
   if np.isclose(lam.min(), lam.max()):
-    return _llik_point(k, x, s)
+    return _llik_point(k, x.A.ravel(), s)
   else:
-    res = scmodes.ebpm.ebpm_npmle(x, s)
+    res = scmodes.ebpm.ebpm_npmle(x.A.ravel(), s)
     return k, np.array(res.rx2('loglik'))[0]
 
-def _map_llik(f, x, s=None, key=None, pool=None):
+def _map_llik(f, x, s=None, pool=None):
   """Return marginal likelihood, returned by f, for each column of x
 
   f - function returning (key, log likelihood) pair
@@ -52,13 +52,10 @@ def _map_llik(f, x, s=None, key=None, pool=None):
 
   """
   if s is None:
-    s = x.X.sum(axis=1).ravel()
+    s = x.X.sum(axis=1).A.ravel()
   result = []
   f = ft.partial(f, s=s)
-  if key is not None:
-    args = zip(x.var[key], x.X.T)
-  else:
-    args = zip(x.var[0], x.X.T)
+  args = zip(x.var.iloc[:,0], x.X.T)
   if pool is not None:
     result = pool.starmap(f, args)
   else:

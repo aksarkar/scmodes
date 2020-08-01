@@ -5,11 +5,8 @@ import scmodes.benchmark.llik
 
 from .fixtures import *
 
-def test__llik_point(test_data):
-  x = test_data
-  gene = 'ENSG00000116251'
-  xj = x[gene]
-  size = x.values.sum(axis=1)
+def test__llik_point(test_adata_one_gene):
+  gene, xj, size = test_adata_one_gene
   k, llik = scmodes.benchmark.llik._llik_point(gene, xj, size)
   assert k == gene
   assert np.isscalar(llik)
@@ -40,11 +37,8 @@ def test_llik_point_gamma(test_adata):
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
-def test__llik_unimodal(test_data):
-  x = test_data
-  gene = 'ENSG00000116251'
-  xj = x[gene]
-  size = x.values.sum(axis=1)
+def test__llik_unimodal(test_adata_one_gene):
+  gene, xj, size = test_adata_one_gene
   k, llik = scmodes.benchmark.llik._llik_unimodal(gene, xj, size)
   assert k == gene
   assert np.isscalar(llik)
@@ -59,11 +53,8 @@ def test_llik_unimodal(test_adata):
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
-def test__llik_npmle(test_data):
-  x = test_data
-  gene = 'ENSG00000116251'
-  xj = x[gene]
-  size = x.values.sum(axis=1)
+def test__llik_npmle(test_adata_one_gene):
+  gene, xj, size = test_adata_one_gene
   k, llik = scmodes.benchmark.llik._llik_npmle(gene, xj, size)
   assert k == gene
   assert np.isscalar(llik)

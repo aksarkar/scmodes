@@ -1,9 +1,10 @@
 import anndata
-import scmodes
 import numpy as np
+import os
 import pandas as pd
 import pytest
-import os
+import scipy.sparse as ss
+import scmodes
 
 @pytest.fixture
 def dims():
@@ -36,5 +37,15 @@ def test_data():
 @pytest.fixture
 def test_adata():
   x = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'counts.txt.gz'), sep='\t', index_col=0)
-  y = anndata.AnnData(x.values, obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
+  y = anndata.AnnData(ss.csr_matrix(x.values), obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
   return y
+
+@pytest.fixture
+def test_adata_one_gene():
+  x = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'counts.txt.gz'), sep='\t', index_col=0)
+  y = anndata.AnnData(ss.csr_matrix(x.values), obs=pd.DataFrame(x.index), var=pd.DataFrame(x.columns))
+  gene = 'ENSG00000116251'
+  yj = y[:,0].X
+  size = y.X.sum(axis=1).A.ravel()
+  return gene, yj, size
+  
