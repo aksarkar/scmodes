@@ -90,7 +90,7 @@ column of x
   log_mean, log_inv_disp, _ = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
   llik = []
   for j in range(x.shape[1]):
-    llik.append((genes[j], st.nbinom(n=np.exp(log_inv_disp[0,j]), p=1 / (1 + s * np.exp(log_mean[0,j] + log_inv_disp[0,j]))).logpmf(x_csc[:,j].A.ravel()).sum()))
+    llik.append((genes[j], st.nbinom(n=np.exp(log_inv_disp[0,j]), p=1 / (1 + s.ravel() * np.exp(log_mean[0,j] - log_inv_disp[0,j]))).logpmf(x_csc[:,j].A.ravel()).sum()))
   return pd.DataFrame(llik, columns=['gene', 'llik']).set_index('gene')
   
 def llik_point_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
@@ -108,7 +108,7 @@ column of x
   llik = []
   for j in range(x.shape[1]):
     xj = x_csc[:,j].A.ravel()
-    nb_llik = st.nbinom(n=np.exp(log_inv_disp[0,j]), p=1 / (1 + s * np.exp(log_mean[0,j] + log_inv_disp[0,j]))).logpmf(xj)
+    nb_llik = st.nbinom(n=np.exp(log_inv_disp[0,j]), p=1 / (1 + s.ravel() * np.exp(log_mean[0,j] - log_inv_disp[0,j]))).logpmf(xj)
     case_zero = -np.log1p(np.exp(-logodds[0,j])) + np.log1p(np.exp(nb_llik - logodds[0,j]))
     case_non_zero = -np.log1p(np.exp(logodds[0,j])) + nb_llik
     llik.append((genes[j], np.where(xj < 1, case_zero, case_non_zero).sum()))
