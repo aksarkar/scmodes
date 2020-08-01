@@ -33,8 +33,8 @@ mass
 
   Returns log mu
 
-  x - array-like [n, 1]
-  s - array-like [n, 1]
+  x - array-like [n,]
+  s - array-like [n,]
 
   """
   x, s = _check_args(x, s)
