@@ -262,19 +262,20 @@ spline
   return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s),
                               do_LRT_test=False, plot_density=False, verbose=False)
 
-def ebpm_npmle(x, s, K=100):
+def ebpm_npmle(x, s, step=1e-5):
   """Return fitted parameters and marginal log likelihood assuming g is an
 arbitrary distribution on non-negative reals
 
   Wrap around ashr::ash_pois, and return the R object directly.
 
-  K - number of grid points
+  step - size of each uniform segment
 
   """
   ashr = rpy2.robjects.packages.importr('ashr')
   x, s = _check_args(x, s)
   lam = x / s
-  grid = np.linspace(0, lam.max(), K + 1)
+  grid = np.arange(0, lam.max(), step)
+  K = grid.shape[0] - 1
   return ashr.ash_pois(
     pd.Series(x), pd.Series(s),
     g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
