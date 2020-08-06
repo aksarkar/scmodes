@@ -41,22 +41,52 @@ mass
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
-def _nb_obj(theta, x, s):
-  """Return negative log likelihood
+def _em(x0, objective_fn, update_fn, max_iters=100, tol=1e-3, *args, **kwargs):
+  x = x0
+  obj = objective_fn(x0, *args, **kwargs)
+  for i in range(max_iters):
+    x = update_fn(x, *args, **kwargs)
+    update = objective_fn(x, *args, **kwargs)
+    if update < obj:
+      raise RuntimeError('llik decreased')
+    elif update - obj < tol:
+      return x, update
+    else:
+      obj = update
+  else:
+    raise RuntimeError(f'failed to converge in max_iters ({update - obj:.3g} > {tol:.3g})')
 
-  x_i ~ Poisson(s_i lambda_i)
-  lambda_i ~ g = Gamma(exp(log_inv_disp), exp(log_mean - log_inv_disp))
+def _squarem(x0, objective_fn, update_fn, max_iters=100, tol=1e-3, *args, **kwargs):
+  """Squared extrapolation method"""
+  x = x0
+  obj = objective_fn(x, *args, **kwargs)
+  for i in range(max_iters):
+    x1 = update_fn(x)
+    diff1 = x1 - x
+    if abs(diff1).sum() < tol:
+      return x1
+    x2 = update_fn(x1)
+    diff2 = x2 - x1
+    if abs(diff2).sum() < tol:
+      return x2
+    x = p + 2 * diff1 + (diff2 - diff1)
+  else:
+    raise RuntimeError(f'failed to converge in max_iters ({update - obj:.3g} > {tol:.3g})')
 
-  theta - array-like [2,]
-  x - array-like [n,]
-  s - array-like [n]
+def _ebpm_gamma_obj(theta, x, s):
+  a, b = theta
+  return st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x).sum()
 
-  """
-  mean = np.exp(theta[0])
-  inv_disp = np.exp(theta[1])
-  return -st.nbinom(n=inv_disp, p=1 / (1 + s * mean / inv_disp)).logpmf(x).sum()
+def _ebpm_gamma_update(theta, x, s):
+  a, b = theta
+  pm = (x + a) / (s + b)
+  plm = sp.digamma(x + a) - np.log(s + b)
+  b = a / pm.mean()
+  # Important: this appears to be given incorrectly in Karlis 2005
+  a += (np.log(b) - sp.digamma(a) + plm.mean()) / sp.polygamma(1, a)
+  return np.array([a, b])
 
-def ebpm_gamma(x, s):
+def ebpm_gamma(x, s, max_iters=100, tol=1e-3, extrapolate=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -67,12 +97,16 @@ distribution
 
   """
   x, s = _check_args(x, s)
-  # Important: initialize at ebpm_point solution
-  opt = so.minimize(_nb_obj, x0=[np.log(x.sum() / s.sum()), 10], args=(x, s), method='Nelder-Mead')
-  if not opt.success:
-    raise RuntimeError(opt.message)
-  nll = opt.fun
-  return opt.x[0], opt.x[1], -nll
+  # a = 1 / phi; b = 1 / (mu phi)
+  # Initialize at the Poisson MLE
+  theta = np.array([1, s.sum() / x.sum()])
+  if extrapolate:
+    raise NotImplementedError
+  else:
+    theta, llik = _em(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
+                      max_iters=max_iters, tol=tol)
+  a, b = theta
+  return -np.log(b) + np.log(a), np.log(a), llik
 
 def _zinb_obj(theta, x, s):
   """Return negative log likelihood
@@ -104,10 +138,8 @@ point-Gamma distribution
 
   """
   x, s = _check_args(x, s)
-  init = so.minimize(_nb_obj, x0=[np.log(x.sum() / s.sum()), 10], args=(x, s), method='Nelder-Mead')
-  if not init.success:
-    raise RuntimeError(init.message)
-  opt = so.minimize(_zinb_obj, x0=[init.x[0], init.x[1], -8], args=(x, s), method='Nelder-Mead')
+  init = ebpm_gamma(x, s)
+  opt = so.minimize(_zinb_obj, x0=[init[0], init[1], -8], args=(x, s), method='Nelder-Mead')
   if not opt.success:
     raise RuntimeError(opt.message)
   nll = opt.fun

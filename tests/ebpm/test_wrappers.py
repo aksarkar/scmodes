@@ -17,17 +17,23 @@ def test_ebpm_point():
   assert np.isfinite(log_mu)
   assert llik > oracle_llik
 
-def test__nb_obj(simulate_gamma):
-  x, s, log_mu, log_phi, oracle_llik = simulate_gamma
-  loss = scmodes.ebpm.wrappers._nb_obj([log_mu, -log_phi], x, s)
-  assert np.isclose(-loss, oracle_llik)
-
 def test_ebpm_gamma(simulate_gamma):
   x, s, log_mu, log_phi, _ = simulate_gamma
   # Important: log_mu, log_phi are [1, p]. We want oracle log likelihood for
   # only gene 0
   oracle_llik = st.nbinom(n=np.exp(-log_phi[0,0]), p=1 / (1 + s.dot(np.exp(log_mu[0,0] + log_phi[0,0])))).logpmf(x[:,0]).sum()
   log_mu_hat, neg_log_phi_hat, llik = scmodes.ebpm.ebpm_gamma(x[:,0], s.ravel())
+  assert np.isfinite(log_mu_hat)
+  assert np.isfinite(neg_log_phi_hat)
+  assert llik > oracle_llik
+
+@pytest.mark.xfail()
+def test_ebpm_gamma_extrapolate(simulate_gamma):
+  x, s, log_mu, log_phi, _ = simulate_gamma
+  # Important: log_mu, log_phi are [1, p]. We want oracle log likelihood for
+  # only gene 0
+  oracle_llik = st.nbinom(n=np.exp(-log_phi[0,0]), p=1 / (1 + s.dot(np.exp(log_mu[0,0] + log_phi[0,0])))).logpmf(x[:,0]).sum()
+  log_mu_hat, neg_log_phi_hat, llik = scmodes.ebpm.ebpm_gamma(x[:,0], s.ravel(), extrapolate=True)
   assert np.isfinite(log_mu_hat)
   assert np.isfinite(neg_log_phi_hat)
   assert llik > oracle_llik
