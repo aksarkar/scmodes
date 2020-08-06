@@ -27,7 +27,6 @@ def test_ebpm_gamma(simulate_gamma):
   assert np.isfinite(neg_log_phi_hat)
   assert llik > oracle_llik
 
-@pytest.mark.xfail()
 def test_ebpm_gamma_extrapolate(simulate_gamma):
   x, s, log_mu, log_phi, _ = simulate_gamma
   # Important: log_mu, log_phi are [1, p]. We want oracle log likelihood for

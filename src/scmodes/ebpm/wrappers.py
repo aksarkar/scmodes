@@ -57,23 +57,45 @@ def _em(x0, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
   else:
     raise RuntimeError(f'failed to converge in max_iters ({diff:.4g} > {tol:.4g})')
 
+def _squarem(x0, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
+  """Squared extrapolation scheme for accelerated EM
 
-def _squarem(x0, objective_fn, update_fn, max_iters=100, tol=1e-3, *args, **kwargs):
-  """Squared extrapolation method"""
+  Reference: 
+
+    Varadhan, R. and Roland, C. (2008), Simple and Globally Convergent Methods
+    for Accelerating the Convergence of Any EM Algorithm. Scandinavian Journal
+    of Statistics, 35: 335-353. doi:10.1111/j.1467-9469.2007.00585.x
+
+  """
   x = x0
   obj = objective_fn(x, *args, **kwargs)
   for i in range(max_iters):
-    x1 = update_fn(x)
-    diff1 = x1 - x
-    if abs(diff1).sum() < tol:
-      return x1
-    x2 = update_fn(x1)
-    diff2 = x2 - x1
-    if abs(diff2).sum() < tol:
-      return x2
-    x = p + 2 * diff1 + (diff2 - diff1)
+    x1 = update_fn(x, *args, **kwargs)
+    r = x1 - x
+    x2 = update_fn(x1, *args, **kwargs)
+    v = (x2 - x1) - r
+    step = -np.sqrt(r @ r) / np.sqrt(v @ v)
+    if step > -1:
+      step = -1
+      x = x - 2 * step * r + step * step * v
+      update = objective_fn(x, *args, **kwargs)
+      diff = update - obj
+    else:
+      candidate = x - 2 * step * r + step * step * v
+      update = objective_fn(candidate, *args, **kwargs)
+      diff = update - obj
+      while not np.isfinite(update) or diff < 0:
+        step = (step - 1) / 2
+        candidate = x - 2 * step * r + step * step * v
+        update = objective_fn(candidate, *args, **kwargs)
+        diff = update - obj
+      x = candidate
+    if diff < tol:
+      return x, update
+    else:
+      obj = update
   else:
-    raise RuntimeError(f'failed to converge in max_iters ({update - obj:.3g} > {tol:.3g})')
+    raise RuntimeError(f'failed to converge in max_iters ({diff:.3g} > {tol:.3g})')
 
 def _ebpm_gamma_obj(theta, x, s):
   a, b = theta
@@ -103,7 +125,8 @@ distribution
   # Initialize at the Poisson MLE
   theta = np.array([1, s.sum() / x.sum()])
   if extrapolate:
-    raise NotImplementedError
+    theta, llik = _squarem(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
+                      max_iters=max_iters, tol=tol)
   else:
     theta, llik = _em(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
                       max_iters=max_iters, tol=tol)
