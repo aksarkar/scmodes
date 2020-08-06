@@ -9,19 +9,19 @@ import scipy.stats as st
 import scmodes
 import sys
 
-def _llik_point(k, x, s):
+def _llik_point(k, x, s, **kwargs):
   """Return marginal likelihood assuming point mass expression model for one
 gene"""
   _, llik = scmodes.ebpm.ebpm_point(x.A.ravel(), s)
   return k, llik
 
-def _llik_gamma(k, x, s):
+def _llik_gamma(k, x, s, **kwargs):
   """Return marginal likelihood assuming point mass expression model for one
 gene"""
-  _, llik = scmodes.ebpm.ebpm_gamma(x.A.ravel(), s)
+  *_, llik = scmodes.ebpm.ebpm_gamma(x.A.ravel(), s, **kwargs)
   return k, llik
 
-def _llik_unimodal(k, x, s):
+def _llik_unimodal(k, x, s, **kwargs):
   """Return marginal likelihood assuming unimodal (non-parametric) expression
 model for one gene
 
@@ -34,7 +34,7 @@ model for one gene
     res = scmodes.ebpm.ebpm_unimodal(x.A.ravel(), s)
     return k, np.array(res.rx2('loglik'))[0]
 
-def _llik_npmle(k, x, s):
+def _llik_npmle(k, x, s, **kwargs):
   """Return marginal likelihood assuming non-parametric expression model for one
 gene
 
@@ -47,7 +47,7 @@ gene
     res = scmodes.ebpm.ebpm_npmle(x.A.ravel(), s)
     return k, np.array(res.rx2('loglik'))[0]
 
-def _map_llik(f, x, s=None, pool=None):
+def _map_llik(f, x, s=None, pool=None, **kwargs):
   """Return marginal likelihood, returned by f, for each column of x
 
   f - function returning (key, log likelihood) pair
@@ -60,7 +60,7 @@ def _map_llik(f, x, s=None, pool=None):
   if s is None:
     s = x.X.sum(axis=1).A.ravel()
   result = []
-  f = ft.partial(f, s=s)
+  f = ft.partial(f, s=s, **kwargs)
   args = zip(x.var.iloc[:,0], x.X.T)
   if pool is not None:
     result = pool.starmap(f, args)
@@ -80,7 +80,7 @@ column of x
   """
   return _map_llik(_llik_point, x, s, pool)
   
-def llik_gamma(x, s=None, pool=None, **kwargs):
+def llik_gamma(x, s=None, pool=None, max_iters=10000, extrapolate=False, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each
 column of x
 
@@ -89,7 +89,7 @@ column of x
   key - column of x.var to use as key (default: first column)
 
   """
-  return _map_llik(_llik_gamma, x, s, pool)
+  return _map_llik(_llik_gamma, x, s, pool, max_iters=max_iters, extrapolate=extrapolate)
   
 def llik_point_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each

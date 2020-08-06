@@ -41,20 +41,22 @@ mass
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
-def _em(x0, objective_fn, update_fn, max_iters=100, tol=1e-3, *args, **kwargs):
+def _em(x0, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
   x = x0
-  obj = objective_fn(x0, *args, **kwargs)
+  obj = objective_fn(x, *args, **kwargs)
   for i in range(max_iters):
     x = update_fn(x, *args, **kwargs)
     update = objective_fn(x, *args, **kwargs)
-    if update < obj:
+    diff = update - obj
+    if diff < 0:
       raise RuntimeError('llik decreased')
-    elif update - obj < tol:
+    elif diff < tol:
       return x, update
     else:
       obj = update
   else:
-    raise RuntimeError(f'failed to converge in max_iters ({update - obj:.3g} > {tol:.3g})')
+    raise RuntimeError(f'failed to converge in max_iters ({diff:.4g} > {tol:.4g})')
+
 
 def _squarem(x0, objective_fn, update_fn, max_iters=100, tol=1e-3, *args, **kwargs):
   """Squared extrapolation method"""
@@ -86,7 +88,7 @@ def _ebpm_gamma_update(theta, x, s):
   a += (np.log(b) - sp.digamma(a) + plm.mean()) / sp.polygamma(1, a)
   return np.array([a, b])
 
-def ebpm_gamma(x, s, max_iters=100, tol=1e-3, extrapolate=False):
+def ebpm_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
