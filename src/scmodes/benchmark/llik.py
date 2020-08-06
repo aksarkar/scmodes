@@ -15,6 +15,12 @@ gene"""
   _, llik = scmodes.ebpm.ebpm_point(x.A.ravel(), s)
   return k, llik
 
+def _llik_gamma(k, x, s):
+  """Return marginal likelihood assuming point mass expression model for one
+gene"""
+  _, llik = scmodes.ebpm.ebpm_gamma(x.A.ravel(), s)
+  return k, llik
+
 def _llik_unimodal(k, x, s):
   """Return marginal likelihood assuming unimodal (non-parametric) expression
 model for one gene
@@ -74,7 +80,7 @@ column of x
   """
   return _map_llik(_llik_point, x, s, pool)
   
-def llik_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
+def llik_gamma(x, s=None, pool=None, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each
 column of x
 
@@ -83,12 +89,7 @@ column of x
   key - column of x.var to use as key (default: first column)
 
   """
-  x_csr, x_csc, s, genes, max_epochs = scmodes.benchmark.gof._sgd_prepare(x, s, key, batch_size)
-  log_mean, log_inv_disp, _ = scmodes.ebpm.sgd.ebpm_gamma(x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
-  llik = []
-  for j in range(x.shape[1]):
-    llik.append((genes[j], st.nbinom(n=np.exp(log_inv_disp[0,j]), p=1 / (1 + s.ravel() * np.exp(log_mean[0,j] - log_inv_disp[0,j]))).logpmf(x_csc[:,j].A.ravel()).sum()))
-  return pd.DataFrame(llik, columns=['gene', 'llik']).set_index('gene')
+  return _map_llik(_llik_gamma, x, s, pool)
   
 def llik_point_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each
