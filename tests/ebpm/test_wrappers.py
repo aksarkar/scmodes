@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import scipy.special as sp
 import scipy.stats as st
 import scmodes.ebpm
@@ -27,6 +28,17 @@ def test_ebpm_gamma(simulate_gamma):
   assert np.isfinite(neg_log_phi_hat)
   assert llik > oracle_llik
 
+def test_ebpm_gamma_degenerate():
+  with open(os.path.join(os.path.dirname(__file__), 'data', 'chromium1-20311.npz'), 'rb') as f:
+    dat = np.load(f)
+    x = dat['x']
+    s = dat['s']
+  _, l0 = scmodes.ebpm.ebpm_point(x, s)
+  log_mu_hat, neg_log_phi_hat, l1 = scmodes.ebpm.ebpm_gamma(x, s, extrapolate=False)
+  assert np.isfinite(log_mu_hat)
+  assert not np.isfinite(neg_log_phi_hat)
+  assert l1 >= l0
+
 def test_ebpm_gamma_extrapolate(simulate_gamma):
   x, s, log_mu, log_phi, _ = simulate_gamma
   # Important: log_mu, log_phi are [1, p]. We want oracle log likelihood for
@@ -36,6 +48,17 @@ def test_ebpm_gamma_extrapolate(simulate_gamma):
   assert np.isfinite(log_mu_hat)
   assert np.isfinite(neg_log_phi_hat)
   assert llik > oracle_llik
+
+def test_ebpm_gamma_extrapolate_degenerate():
+  with open(os.path.join(os.path.dirname(__file__), 'data', 'chromium1-20311.npz'), 'rb') as f:
+    dat = np.load(f)
+    x = dat['x']
+    s = dat['s']
+  _, l0 = scmodes.ebpm.ebpm_point(x, s)
+  log_mu_hat, neg_log_phi_hat, l1 = scmodes.ebpm.ebpm_gamma(x, s, extrapolate=True)
+  assert np.isfinite(log_mu_hat)
+  assert not np.isfinite(neg_log_phi_hat)
+  assert l1 >= l0
 
 def test_ebpm_point_gamma(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, _ = simulate_point_gamma

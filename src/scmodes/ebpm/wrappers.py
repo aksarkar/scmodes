@@ -42,13 +42,17 @@ mass
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
 def _em(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
-  theta = init
+  theta = init.copy()
   obj = objective_fn(theta, *args, **kwargs)
   for i in range(max_iters):
     theta = update_fn(theta, *args, **kwargs)
     update = objective_fn(theta, *args, **kwargs)
     diff = update - obj
-    if diff < 0:
+    if i == 0 and diff < 0:
+      # Hack: this is needed for numerical reasons, because in e.g.,
+      # ebpm_gamma, a point mass is the limit as b → ∞
+      return init, obj
+    elif diff < 0:
       raise RuntimeError('llik decreased')
     elif diff < tol:
       return theta, update
@@ -72,6 +76,10 @@ def _squarem(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
   for i in range(max_iters):
     x1 = update_fn(theta, *args, **kwargs)
     r = x1 - theta
+    if i == 0 and objective_fn(x1, *args, **kwargs) < obj:
+      # Hack: this is needed for numerical reasons, because in e.g.,
+      # ebpm_gamma, a point mass is the limit as b → ∞
+      return init, obj
     x2 = update_fn(x1, *args, **kwargs)
     v = (x2 - x1) - r
     step = -np.sqrt(r @ r) / np.sqrt(v @ v)
@@ -123,15 +131,20 @@ distribution
   x, s = _check_args(x, s)
   # a = 1 / phi; b = 1 / (mu phi)
   # Initialize at the Poisson MLE
-  theta = np.array([1, s.sum() / x.sum()])
+  init = np.array([1, s.sum() / x.sum()])
   if extrapolate:
-    theta, llik = _squarem(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
+    theta, llik = _squarem(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
                            max_iters=max_iters, tol=tol)
   else:
-    theta, llik = _em(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
+    theta, llik = _em(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
                       max_iters=max_iters, tol=tol)
-  a, b = theta
-  return np.log(a) - np.log(b), np.log(a), llik
+  if np.isclose(theta, init).all():
+    # First EM update rejected, so just use the point mass model
+    log_mean, llik = ebpm_point(x, s)
+    return log_mean, np.inf, llik
+  else:
+    a, b = theta
+    return np.log(a) - np.log(b), np.log(a), llik
 
 def _ebpm_point_gamma_obj(theta, x, s):
   """Return negative log likelihood
