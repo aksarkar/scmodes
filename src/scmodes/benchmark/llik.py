@@ -12,10 +12,13 @@ gene"""
   _, llik = scmodes.ebpm.ebpm_point(x.A.ravel(), s)
   return k, llik
 
-def _llik_gamma(k, x, s, **kwargs):
+def _llik_gamma(k, x, s, max_iters, tol, extrapolate, **kwargs):
   """Return marginal likelihood assuming point mass expression model for one
-gene"""
-  *_, llik = scmodes.ebpm.ebpm_gamma(x.A.ravel(), s, **kwargs)
+gene
+
+  """
+  *_, llik = scmodes.ebpm.ebpm_gamma(x.A.ravel(), s, max_iters=max_iters,
+                                     tol=tol, extrapolate=extrapolate)
   return k, llik
 
 def _llik_unimodal(k, x, s, **kwargs):

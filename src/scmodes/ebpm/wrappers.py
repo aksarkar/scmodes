@@ -133,7 +133,7 @@ distribution
   a, b = theta
   return np.log(a) - np.log(b), np.log(a), llik
 
-def _zinb_obj(theta, x, s):
+def _ebpm_point_gamma_obj(theta, x, s):
   """Return negative log likelihood
 
   x_i ~ Poisson(s_i lambda_i)
@@ -144,15 +144,25 @@ def _zinb_obj(theta, x, s):
   s - array-like [n,]
 
   """
-  mean = np.exp(theta[0])
-  inv_disp = np.exp(theta[1])
-  logodds = theta[2]
-  nb = st.nbinom(n=inv_disp, p=1 / (1 + s * mean / inv_disp)).logpmf(x)
+  logodds, a, b = theta
+  nb = st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x)
   case_zero = -np.log1p(np.exp(-logodds)) + np.log1p(np.exp(nb - logodds))
   case_nonzero = -np.log1p(np.exp(logodds)) + nb
   return -np.where(x < 1, case_zero, case_nonzero).sum()
 
-def ebpm_point_gamma(x, s):
+def _ebpm_point_gamma_update(theta, x, s):
+  logodds, a, b = theta
+  p = sp.expit(logodds)
+  nb_llik = st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x)
+  z = p * np.exp(nb_llik) / (1 - p + p * np.exp(nb_llik))
+  pm = (x + a) / (s + b)
+  plm = sp.digamma(x + a) - np.log(s + b)
+  logodds = z.sum() / (1 - z).sum()
+  b = a * z.sum() / (z * pm).sum()
+  a += (z * (np.log(b) - sp.digamma(a) + plm)).sum() / (z * sp.polygamma(1, a))
+  return np.array([logodds, a, b])
+
+def ebpm_point_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=False):
   """Return fitted parameters and marginal log likelihood assuming g is a
 point-Gamma distribution
 
@@ -163,12 +173,16 @@ point-Gamma distribution
 
   """
   x, s = _check_args(x, s)
-  init = ebpm_gamma(x, s)
-  opt = so.minimize(_zinb_obj, x0=[init[0], init[1], -8], args=(x, s), method='Nelder-Mead')
-  if not opt.success:
-    raise RuntimeError(opt.message)
-  nll = opt.fun
-  return opt.x[0], opt.x[1], opt.x[2], -nll
+  theta = np.array([-8, 1, s.sum() / x.sum()])
+  if extrapolate:
+    theta, llik = _squarem(theta, _ebpm_point_gamma_obj,
+                           _ebpm_point_gamma_update, x=x, s=s,
+                           max_iters=max_iters, tol=tol)
+  else:
+    theta, llik = _em(theta, _ebpm_point_gamma_obj, _ebpm_point_gamma_update,
+                      x=x, s=s, max_iters=max_iters, tol=tol)
+  logodds, a, b = theta
+  return np.log(a) - np.log(b), np.log(a), logodds, llik
 
 def ebpm_unimodal(x, s, mixcompdist='halfuniform', **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is a
