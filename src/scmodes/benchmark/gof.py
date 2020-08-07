@@ -185,20 +185,17 @@ def gof_zig(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
 def _ash_cdf(x, fit, s, thresh=1e-8):
   """Compute marginal CDF of the data"""
   # Ref: https://lsun.github.io/truncash/diagnostic_plot.html#ash:_normal_likelihood,_uniform_mixture_prior
-  a = np.array(fit.rx2('fitted_g').rx2('a'))
-  b = np.array(fit.rx2('fitted_g').rx2('b'))
-  pi = np.array(fit.rx2('fitted_g').rx2('pi'))
+  g = np.array(fit.rx2('fitted_g'))
+  g = g[:,g[0] > thresh]
+  pi, a, b = g
   N = x.shape[0]
   K = a.shape[0]
   F = np.zeros((N, K))
   for i in range(N):
+    if x[i] < 0:
+      continue
     for k in range(K):
-      if pi[k] < thresh:
-        continue
-      elif x[i] < 0:
-        # Important: we need to handle x = -1
-        F[i,k] = 0
-      elif np.isclose(a[k], b[k]):
+      if np.isclose(a[k], b[k]):
         F[i,k] = st.poisson(mu=s[i] * a[k]).cdf(x[i])
       else:
         ak = min(a[k], b[k])
