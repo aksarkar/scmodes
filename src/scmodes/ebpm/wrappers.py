@@ -185,6 +185,24 @@ def _ebpm_point_gamma_obj(theta, x, s):
   case_nonzero = -np.log1p(np.exp(-logodds)) + nb
   return np.where(x < 1, case_zero, case_nonzero).sum()
 
+def _ebpm_point_gamma_update_a(init, z, plm, b, step=1, c=0.5, tau=0.5, max_iters=30):
+  """Backtracking line search to select step size for Newton-Raphson update of
+a"""
+  def loss(a):
+    return -(z * (a * np.log(b) + a * plm - sp.gammaln(a))).sum()
+  obj = loss(init)
+  d = (z * (np.log(b) - sp.digamma(init) + plm)).sum() / (z * sp.polygamma(1, init)).sum()
+  update = loss(init + step * d)
+  while (not np.isfinite(update) or update > obj + c * step * d) and max_iters > 0:
+    step *= tau
+    update = loss(init + step * d)
+    max_iters -= 1
+  if max_iters == 0:
+    # Step size is small enough that update can be skipped
+    return init
+  else:
+    return init + step * d
+
 def _ebpm_point_gamma_update(theta, x, s):
   logodds, a, b = theta
   p = sp.expit(logodds)
@@ -194,7 +212,7 @@ def _ebpm_point_gamma_update(theta, x, s):
   plm = sp.digamma(x + a) - np.log(s + b)
   logodds = np.log(z.sum()) - np.log((1 - z).sum())
   b = a * z.sum() / (z * pm).sum()
-  a += (z * (np.log(b) - sp.digamma(a) + plm)).sum() / (z * sp.polygamma(1, a)).sum()
+  a = _ebpm_point_gamma_update_a(a, z, plm, b)
   return np.array([logodds, a, b])
 
 def ebpm_point_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=True):
