@@ -61,7 +61,7 @@ def _em(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
   else:
     raise RuntimeError(f'failed to converge in max_iters ({diff:.4g} > {tol:.4g})')
 
-def _squarem(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
+def _squarem(init, objective_fn, update_fn, max_iters, tol, max_step_updates=10, *args, **kwargs):
   """Squared extrapolation scheme for accelerated EM
 
   Reference: 
@@ -78,7 +78,7 @@ def _squarem(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
     r = x1 - theta
     if i == 0 and objective_fn(x1, *args, **kwargs) < obj:
       # Hack: this is needed for numerical reasons, because in e.g.,
-      # ebpm_gamma, a point mass is the limit as b → ∞
+      # ebpm_gamma, a point mass is the limit as a = 1/φ → ∞
       return init, obj
     x2 = update_fn(x1, *args, **kwargs)
     v = (x2 - x1) - r
@@ -89,15 +89,20 @@ def _squarem(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
       update = objective_fn(theta, *args, **kwargs)
       diff = update - obj
     else:
-      candidate = theta - 2 * step * r + step * step * v
-      update = objective_fn(candidate, *args, **kwargs)
-      diff = update - obj
-      while not np.isfinite(update) or diff < 0:
-        step = (step - 1) / 2
+      # Step length = -1 is EM; use as large a step length as is feasible to
+      # maintain monotonicity
+      for j in range(max_step_updates):
         candidate = theta - 2 * step * r + step * step * v
         update = objective_fn(candidate, *args, **kwargs)
         diff = update - obj
-      theta = candidate
+        if np.isfinite(update) and diff > 0:
+          theta = candidate
+          break
+        else:
+          step = (step - 1) / 2
+      else:
+        # No acceptable step length found, reject the update
+        return theta, obj
     if diff < tol:
       return theta, update
     else:
