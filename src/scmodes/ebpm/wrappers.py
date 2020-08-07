@@ -114,13 +114,30 @@ def _ebpm_gamma_obj(theta, x, s):
   a, b = theta
   return st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x).sum()
 
+def _ebpm_gamma_update_a(init, b, plm, step=1, c=0.5, tau=0.5, max_iters=30):
+  """Backtracking line search to select step size for Newton-Raphson update of
+a"""
+  def loss(a):
+    return -(a * np.log(b) + a * plm - sp.gammaln(a)).sum()
+  obj = loss(init)
+  d = (np.log(b) - sp.digamma(init) + plm).mean() / sp.polygamma(1, init)
+  update = loss(init + step * d)
+  while (not np.isfinite(update) or update > obj + c * step * d) and max_iters > 0:
+    step *= tau
+    update = loss(init + step * d)
+    max_iters -= 1
+  if max_iters == 0:
+    # Step size is small enough that update can be skipped
+    return init
+  else:
+    return init + step * d
+
 def _ebpm_gamma_update(theta, x, s):
   a, b = theta
   pm = (x + a) / (s + b)
   plm = sp.digamma(x + a) - np.log(s + b)
   b = a / pm.mean()
-  # Important: this appears to be given incorrectly in Karlis 2005
-  a += (np.log(b) - sp.digamma(a) + plm).mean() / sp.polygamma(1, a)
+  a = _ebpm_gamma_update_a(a, b, plm)
   return np.array([a, b])
 
 def ebpm_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=True):
