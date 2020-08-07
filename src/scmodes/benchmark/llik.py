@@ -1,10 +1,7 @@
-import anndata
 import functools as ft
 import numpy as np
 import pandas as pd
-import rpy2.robjects.numpy2ri
 import rpy2.robjects.packages
-import rpy2.robjects.pandas2ri
 import scipy.stats as st
 import scmodes
 import sys
@@ -53,7 +50,6 @@ def _map_llik(f, x, s=None, pool=None, **kwargs):
   f - function returning (key, log likelihood) pair
   x - Anndata (n, p)
   s - size factor (n,) (default: total molecules per sample)
-  key - column of x.var to use as key (default: first column)
   pool - multiprocessing.Pool
 
   """
@@ -80,13 +76,13 @@ column of x
   """
   return _map_llik(_llik_point, x, s, pool)
   
-def llik_gamma(x, s=None, pool=None, max_iters=10000, tol=1e-7, extrapolate=True, **kwargs):
+def llik_gamma(x, s=None, pool=None, max_iters=10000, tol=1e-7,
+               extrapolate=True, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each
 column of x
 
   x - Anndata (n, p)
   s - size factor (n,) (default: total molecules per sample)
-  key - column of x.var to use as key (default: first column)
 
   """
   return _map_llik(_llik_gamma, x, s, pool, max_iters=max_iters, tol=tol,
