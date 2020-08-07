@@ -22,7 +22,7 @@ def test_ebpm_gamma(simulate_gamma):
   # Important: log_mu, log_phi are [1, p]. We want oracle log likelihood for
   # only gene 0
   oracle_llik = st.nbinom(n=np.exp(-log_phi[0,0]), p=1 / (1 + s.dot(np.exp(log_mu[0,0] + log_phi[0,0])))).logpmf(x[:,0]).sum()
-  log_mu_hat, neg_log_phi_hat, llik = scmodes.ebpm.ebpm_gamma(x[:,0], s.ravel())
+  log_mu_hat, neg_log_phi_hat, llik = scmodes.ebpm.ebpm_gamma(x[:,0], s.ravel(), extrapolate=False)
   assert np.isfinite(log_mu_hat)
   assert np.isfinite(neg_log_phi_hat)
   assert llik > oracle_llik

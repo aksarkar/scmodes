@@ -110,7 +110,7 @@ def _ebpm_gamma_update(theta, x, s):
   a += (np.log(b) - sp.digamma(a) + plm).mean() / sp.polygamma(1, a)
   return np.array([a, b])
 
-def ebpm_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=False):
+def ebpm_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=True):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
