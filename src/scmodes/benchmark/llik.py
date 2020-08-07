@@ -80,7 +80,7 @@ column of x
   """
   return _map_llik(_llik_point, x, s, pool)
   
-def llik_gamma(x, s=None, pool=None, max_iters=10000, extrapolate=True, **kwargs):
+def llik_gamma(x, s=None, pool=None, max_iters=10000, tol=1e-7, extrapolate=True, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each
 column of x
 
@@ -89,7 +89,8 @@ column of x
   key - column of x.var to use as key (default: first column)
 
   """
-  return _map_llik(_llik_gamma, x, s, pool, max_iters=max_iters, extrapolate=extrapolate)
+  return _map_llik(_llik_gamma, x, s, pool, max_iters=max_iters, tol=tol,
+                   extrapolate=extrapolate)
   
 def llik_point_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
   """Return marginal log likelihood of Gamma expression model for each

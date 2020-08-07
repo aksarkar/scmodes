@@ -107,7 +107,7 @@ def _ebpm_gamma_update(theta, x, s):
   plm = sp.digamma(x + a) - np.log(s + b)
   b = a / pm.mean()
   # Important: this appears to be given incorrectly in Karlis 2005
-  a += (np.log(b) - sp.digamma(a) + plm.mean()) / sp.polygamma(1, a)
+  a += (np.log(b) - sp.digamma(a) + plm).mean() / sp.polygamma(1, a)
   return np.array([a, b])
 
 def ebpm_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=False):
@@ -126,12 +126,12 @@ distribution
   theta = np.array([1, s.sum() / x.sum()])
   if extrapolate:
     theta, llik = _squarem(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
-                      max_iters=max_iters, tol=tol)
+                           max_iters=max_iters, tol=tol)
   else:
     theta, llik = _em(theta, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
                       max_iters=max_iters, tol=tol)
   a, b = theta
-  return -np.log(b) + np.log(a), np.log(a), llik
+  return np.log(a) - np.log(b), np.log(a), llik
 
 def _zinb_obj(theta, x, s):
   """Return negative log likelihood
