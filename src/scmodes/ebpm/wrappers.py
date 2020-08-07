@@ -146,23 +146,23 @@ def _ebpm_point_gamma_obj(theta, x, s):
   """
   logodds, a, b = theta
   nb = st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x)
-  case_zero = -np.log1p(np.exp(-logodds)) + np.log1p(np.exp(nb - logodds))
-  case_nonzero = -np.log1p(np.exp(logodds)) + nb
-  return -np.where(x < 1, case_zero, case_nonzero).sum()
+  case_zero = -np.log1p(np.exp(logodds)) + np.log1p(np.exp(nb + logodds))
+  case_nonzero = -np.log1p(np.exp(-logodds)) + nb
+  return np.where(x < 1, case_zero, case_nonzero).sum()
 
 def _ebpm_point_gamma_update(theta, x, s):
   logodds, a, b = theta
   p = sp.expit(logodds)
-  nb_llik = st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x)
-  z = p * np.exp(nb_llik) / (1 - p + p * np.exp(nb_llik))
+  nb_lik = st.nbinom(n=a, p=1 / (1 + s / b)).pmf(x)
+  z = np.where(x < 1, p * nb_lik / (1 - p + p * nb_lik), 1)
   pm = (x + a) / (s + b)
   plm = sp.digamma(x + a) - np.log(s + b)
-  logodds = z.sum() / (1 - z).sum()
+  logodds = np.log(z.sum()) - np.log((1 - z).sum())
   b = a * z.sum() / (z * pm).sum()
-  a += (z * (np.log(b) - sp.digamma(a) + plm)).sum() / (z * sp.polygamma(1, a))
+  a += (z * (np.log(b) - sp.digamma(a) + plm)).sum() / (z * sp.polygamma(1, a)).sum()
   return np.array([logodds, a, b])
 
-def ebpm_point_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=False):
+def ebpm_point_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=True):
   """Return fitted parameters and marginal log likelihood assuming g is a
 point-Gamma distribution
 
@@ -173,13 +173,13 @@ point-Gamma distribution
 
   """
   x, s = _check_args(x, s)
-  theta = np.array([-8, 1, s.sum() / x.sum()])
+  init = np.array([8, 1, s.sum() / x.sum()])
   if extrapolate:
-    theta, llik = _squarem(theta, _ebpm_point_gamma_obj,
+    theta, llik = _squarem(init, _ebpm_point_gamma_obj,
                            _ebpm_point_gamma_update, x=x, s=s,
                            max_iters=max_iters, tol=tol)
   else:
-    theta, llik = _em(theta, _ebpm_point_gamma_obj, _ebpm_point_gamma_update,
+    theta, llik = _em(init, _ebpm_point_gamma_obj, _ebpm_point_gamma_update,
                       x=x, s=s, max_iters=max_iters, tol=tol)
   logodds, a, b = theta
   return np.log(a) - np.log(b), np.log(a), logodds, llik

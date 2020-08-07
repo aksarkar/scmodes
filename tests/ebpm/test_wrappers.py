@@ -37,11 +37,6 @@ def test_ebpm_gamma_extrapolate(simulate_gamma):
   assert np.isfinite(neg_log_phi_hat)
   assert llik > oracle_llik
 
-def test__zinb_obj(simulate_point_gamma):
-  x, s, log_mu, log_phi, logodds, oracle_llik = simulate_point_gamma
-  loss = scmodes.ebpm.wrappers._zinb_obj([log_mu, -log_phi, logodds], x, s)
-  assert np.isclose(-loss, oracle_llik)
-
 def test_ebpm_point_gamma(simulate_point_gamma):
   x, s, log_mu, log_phi, logodds, _ = simulate_point_gamma
   # Important: log_mu, log_phi, logodds are [1, p]. We want oracle log
@@ -50,7 +45,21 @@ def test_ebpm_point_gamma(simulate_point_gamma):
   F = st.nbinom(n=np.exp(-log_phi[0,0]), p=1 / (1 + s.dot(np.exp(log_mu[0,0] + log_phi[0,0]))))
   oracle_llik_nonzero = np.log(1 - pi0) + F.logpmf(x[:,0])
   oracle_llik = np.where(x[:,0] < 1, np.log(pi0 + np.exp(oracle_llik_nonzero)), oracle_llik_nonzero).sum()
-  log_mu_hat, neg_log_phi_hat, logodds_hat, llik = scmodes.ebpm.ebpm_point_gamma(x[:,0], s.ravel())
+  log_mu_hat, neg_log_phi_hat, logodds_hat, llik = scmodes.ebpm.ebpm_point_gamma(x[:,0], s.ravel(), extrapolate=False)
+  assert np.isfinite(log_mu_hat)
+  assert np.isfinite(neg_log_phi_hat)
+  assert np.isfinite(logodds_hat)
+  assert llik > oracle_llik
+
+def test_ebpm_point_gamma_extrapolate(simulate_point_gamma):
+  x, s, log_mu, log_phi, logodds, _ = simulate_point_gamma
+  # Important: log_mu, log_phi, logodds are [1, p]. We want oracle log
+  # likelihood for only gene 0
+  pi0 = sp.expit(logodds[0,0])
+  F = st.nbinom(n=np.exp(-log_phi[0,0]), p=1 / (1 + s.dot(np.exp(log_mu[0,0] + log_phi[0,0]))))
+  oracle_llik_nonzero = np.log(1 - pi0) + F.logpmf(x[:,0])
+  oracle_llik = np.where(x[:,0] < 1, np.log(pi0 + np.exp(oracle_llik_nonzero)), oracle_llik_nonzero).sum()
+  log_mu_hat, neg_log_phi_hat, logodds_hat, llik = scmodes.ebpm.ebpm_point_gamma(x[:,0], s.ravel(), extrapolate=True)
   assert np.isfinite(log_mu_hat)
   assert np.isfinite(neg_log_phi_hat)
   assert np.isfinite(logodds_hat)
