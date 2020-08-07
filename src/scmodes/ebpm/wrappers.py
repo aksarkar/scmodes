@@ -262,7 +262,7 @@ spline
   return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s),
                               do_LRT_test=False, plot_density=False, verbose=False)
 
-def ebpm_npmle(x, s, step=1e-5):
+def ebpm_npmle(x, s, step=1e-5, **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is an
 arbitrary distribution on non-negative reals
 
@@ -278,4 +278,5 @@ arbitrary distribution on non-negative reals
   K = grid.shape[0] - 1
   return ashr.ash_pois(
     pd.Series(x), pd.Series(s),
-    g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])))
+    g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])),
+    **kwargs)
