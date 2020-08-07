@@ -41,23 +41,23 @@ mass
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
-def _em(x0, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
-  x = x0
-  obj = objective_fn(x, *args, **kwargs)
+def _em(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
+  theta = init
+  obj = objective_fn(theta, *args, **kwargs)
   for i in range(max_iters):
-    x = update_fn(x, *args, **kwargs)
-    update = objective_fn(x, *args, **kwargs)
+    theta = update_fn(theta, *args, **kwargs)
+    update = objective_fn(theta, *args, **kwargs)
     diff = update - obj
     if diff < 0:
       raise RuntimeError('llik decreased')
     elif diff < tol:
-      return x, update
+      return theta, update
     else:
       obj = update
   else:
     raise RuntimeError(f'failed to converge in max_iters ({diff:.4g} > {tol:.4g})')
 
-def _squarem(x0, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
+def _squarem(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
   """Squared extrapolation scheme for accelerated EM
 
   Reference: 
@@ -67,31 +67,31 @@ def _squarem(x0, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
     of Statistics, 35: 335-353. doi:10.1111/j.1467-9469.2007.00585.x
 
   """
-  x = x0
-  obj = objective_fn(x, *args, **kwargs)
+  theta = init
+  obj = objective_fn(theta, *args, **kwargs)
   for i in range(max_iters):
-    x1 = update_fn(x, *args, **kwargs)
-    r = x1 - x
+    x1 = update_fn(theta, *args, **kwargs)
+    r = x1 - theta
     x2 = update_fn(x1, *args, **kwargs)
     v = (x2 - x1) - r
     step = -np.sqrt(r @ r) / np.sqrt(v @ v)
     if step > -1:
       step = -1
-      x = x - 2 * step * r + step * step * v
-      update = objective_fn(x, *args, **kwargs)
+      theta += - 2 * step * r + step * step * v
+      update = objective_fn(theta, *args, **kwargs)
       diff = update - obj
     else:
-      candidate = x - 2 * step * r + step * step * v
+      candidate = theta - 2 * step * r + step * step * v
       update = objective_fn(candidate, *args, **kwargs)
       diff = update - obj
       while not np.isfinite(update) or diff < 0:
         step = (step - 1) / 2
-        candidate = x - 2 * step * r + step * step * v
+        candidate = theta - 2 * step * r + step * step * v
         update = objective_fn(candidate, *args, **kwargs)
         diff = update - obj
-      x = candidate
+      theta = candidate
     if diff < tol:
-      return x, update
+      return theta, update
     else:
       obj = update
   else:
