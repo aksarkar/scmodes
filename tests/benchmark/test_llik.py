@@ -21,6 +21,14 @@ def test_llik_point(test_adata):
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
 
+def test__llik_gamma(test_adata_one_gene):
+  gene, xj, size = test_adata_one_gene
+  k, llik = scmodes.benchmark.llik._llik_gamma(gene, xj, size, max_iters=1000, tol=1e-3, extrapolate=True)
+  assert k == gene
+  assert np.isscalar(llik)
+  assert np.isfinite(llik)
+  assert llik <= 0
+
 def test_llik_gamma(test_adata):
   x = test_adata
   res = scmodes.benchmark.llik.llik_gamma(x)
@@ -28,6 +36,14 @@ def test_llik_gamma(test_adata):
   assert (res.index == x.var[0]).all()
   assert np.isfinite(res['llik']).all()
   assert (res['llik'] <= 0).all()
+
+def test__llik_point_gamma(test_adata_one_gene):
+  gene, xj, size = test_adata_one_gene
+  k, llik = scmodes.benchmark.llik._llik_point_gamma(gene, xj, size, max_iters=1000, tol=1e-3, extrapolate=True)
+  assert k == gene
+  assert np.isscalar(llik)
+  assert np.isfinite(llik)
+  assert llik <= 0
 
 def test_llik_point_gamma(test_adata):
   x = test_adata

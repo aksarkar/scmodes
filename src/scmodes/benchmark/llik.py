@@ -13,12 +13,21 @@ gene"""
   return k, llik
 
 def _llik_gamma(k, x, s, max_iters, tol, extrapolate, **kwargs):
-  """Return marginal likelihood assuming point mass expression model for one
+  """Return marginal likelihood assuming Gamma expression model for one
 gene
 
   """
   *_, llik = scmodes.ebpm.ebpm_gamma(x.A.ravel(), s, max_iters=max_iters,
                                      tol=tol, extrapolate=extrapolate)
+  return k, llik
+
+def _llik_point_gamma(k, x, s, max_iters, tol, extrapolate, **kwargs):
+  """Return marginal likelihood assuming point-Gamma expression model for one
+gene
+
+  """
+  *_, llik = scmodes.ebpm.ebpm_point_gamma(x.A.ravel(), s, max_iters=max_iters,
+                                           tol=tol, extrapolate=extrapolate)
   return k, llik
 
 def _llik_unimodal(k, x, s, **kwargs):
@@ -91,8 +100,9 @@ column of x
   return _map_llik(_llik_gamma, x, s, pool, max_iters=max_iters, tol=tol,
                    extrapolate=extrapolate)
   
-def llik_point_gamma(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
-  """Return marginal log likelihood of Gamma expression model for each
+def llik_point_gamma(x, s=None, pool=None, max_iters=10000, tol=1e-7,
+                     extrapolate=True, lr=1e-2, **kwargs):
+  """Return marginal log likelihood of point-Gamma expression model for each
 column of x
 
   x - Anndata (n, p)
@@ -100,17 +110,8 @@ column of x
   key - column of x.var to use as key (default: first column)
 
   """
-  x_csr, x_csc, s, genes, max_epochs = scmodes.benchmark.gof._sgd_prepare(x, s, key, batch_size)
-  log_mean, log_inv_disp, logodds, _ = scmodes.ebpm.sgd.ebpm_point_gamma(
-    x_csr, s=s, batch_size=batch_size, lr=lr, max_epochs=max_epochs)
-  llik = []
-  for j in range(x.shape[1]):
-    xj = x_csc[:,j].A.ravel()
-    nb_llik = st.nbinom(n=np.exp(log_inv_disp[0,j]), p=1 / (1 + s.ravel() * np.exp(log_mean[0,j] - log_inv_disp[0,j]))).logpmf(xj)
-    case_zero = -np.log1p(np.exp(-logodds[0,j])) + np.log1p(np.exp(nb_llik - logodds[0,j]))
-    case_non_zero = -np.log1p(np.exp(logodds[0,j])) + nb_llik
-    llik.append((genes[j], np.where(xj < 1, case_zero, case_non_zero).sum()))
-  return pd.DataFrame(llik, columns=['gene', 'llik']).set_index('gene')
+  return _map_llik(_llik_point_gamma, x, s, pool, max_iters=max_iters, tol=tol,
+                   extrapolate=extrapolate)
 
 def llik_unimodal(x, s=None, pool=None, **kwargs):
   """Return marginal log likelihood of unimodal non-parametric expression model
