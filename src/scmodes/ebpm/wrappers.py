@@ -210,7 +210,7 @@ def _ebpm_point_gamma_update(theta, x, s):
   z = np.where(x < 1, p * nb_lik / (1 - p + p * nb_lik), 1)
   pm = (x + a) / (s + b)
   plm = sp.digamma(x + a) - np.log(s + b)
-  logodds = np.log(z.sum()) - np.log((1 - z).sum())
+  logodds = np.log(z.sum()) - np.log((1 - z).sum() + 1e-16)
   b = a * z.sum() / (z * pm).sum()
   a = _ebpm_point_gamma_update_a(a, z, plm, b)
   return np.array([logodds, a, b])
@@ -235,7 +235,7 @@ point-Gamma distribution
     theta, llik = _em(init, _ebpm_point_gamma_obj, _ebpm_point_gamma_update,
                       x=x, s=s, max_iters=max_iters, tol=tol)
   logodds, a, b = theta
-  return np.log(a) - np.log(b), np.log(a), logodds, llik
+  return np.log(a) - np.log(b), np.log(a), -logodds, llik
 
 def ebpm_unimodal(x, s, mixcompdist='halfuniform', **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is a
