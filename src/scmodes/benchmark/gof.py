@@ -183,8 +183,14 @@ def gof_zig(x, s=None, key=None, batch_size=64, lr=1e-2, **kwargs):
           .set_index('gene'))
 
 def _ash_cdf(x, fit, s, thresh=1e-8):
-  """Compute marginal CDF of the data"""
-  # Ref: https://lsun.github.io/truncash/diagnostic_plot.html#ash:_normal_likelihood,_uniform_mixture_prior
+  """Compute marginal CDF of the data
+
+  References:
+    https://lsun.github.io/truncash/diagnostic_plot.html#ash:_normal_likelihood,_uniform_mixture_prior
+
+    https://aksarkar.github.io/singlecell-modes/gof.html#org1e959d4
+
+  """
   g = np.array(fit.rx2('fitted_g'))
   g = g[:,g[0] > thresh]
   pi, a, b = g
