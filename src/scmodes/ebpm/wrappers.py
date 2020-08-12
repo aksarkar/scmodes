@@ -262,7 +262,7 @@ spline
   return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s),
                               do_LRT_test=False, plot_density=False, verbose=False)
 
-def ebpm_npmle(x, s, K=64, max_grid_updates=20, tol=1e-3, thresh=1e-8, **kwargs):
+def ebpm_npmle(x, s, K=512, max_grid_updates=40, tol=1e-7, thresh=1e-8, **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is an
 arbitrary distribution on non-negative reals
 
@@ -298,7 +298,10 @@ arbitrary distribution on non-negative reals
       **kwargs)
     update = fit1.rx2('loglik')[0]
     if update < obj:
-      raise RuntimeError('loglik decreased')
+      if obj - update < tol:
+        return fit
+      else:
+        raise RuntimeError('loglik decreased')
     elif update - obj < tol:
       return fit1
     else:
