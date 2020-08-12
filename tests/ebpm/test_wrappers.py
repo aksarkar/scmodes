@@ -110,3 +110,12 @@ def test_ebpm_npmle(simulate_gamma):
   res = scmodes.ebpm.ebpm_npmle(x[:,0], s.ravel())
   llik = np.array(res.rx2('loglik'))
   assert llik > oracle_llik
+
+def test_ebpm_npmle_grid():
+  with open(os.path.join(os.path.dirname(__file__), 'data', 'gemcode-ERCC-00012.npz'), 'rb') as f:
+    dat = np.load(f)
+    x = dat['x']
+    s = dat['s']
+  fit0 = scmodes.ebpm.ebpm_unimodal(x, s)
+  fit1 = scmodes.ebpm.ebpm_npmle(x, s)
+  assert fit1.rx2('loglik')[0] >= fit0.rx2('loglik')[0]

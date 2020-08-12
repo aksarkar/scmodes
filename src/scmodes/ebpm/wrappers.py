@@ -262,14 +262,13 @@ spline
   return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s),
                               do_LRT_test=False, plot_density=False, verbose=False)
 
-def ebpm_npmle(x, s, K=128, grid_update=2, max_grid_updates=10, tol=1, thresh=1e-8, **kwargs):
+def ebpm_npmle(x, s, K=64, max_grid_updates=20, tol=1e-3, thresh=1e-8, **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is an
 arbitrary distribution on non-negative reals
 
   Wrap around ashr::ash_pois, and return the R object directly.
 
   K - initial grid size
-  grid_update - number of times to split each grid segment
   max_grid_updates - maximum number of updates to refine grid
   tol - threshold improvement in log likelihood to stop refinment
   thresh - threshold prior probability to drop segment
@@ -287,18 +286,23 @@ arbitrary distribution on non-negative reals
   for i in range(max_grid_updates):
     g = np.array(fit.rx2('fitted_g'))
     g = g[:,g[0] > thresh]
-    grid = np.linspace(g[1], g[2], 3).ravel(order='F')
-    K = grid.shape[0] - 1
-    fit = ashr.ash_pois(
+    # Important: we want to split each segment in 2, but linspace includes the
+    # endpoint
+    grid = np.linspace(g[1], g[2], 3)
+    a = pd.Series(grid[:-1,:].ravel(order='F'))
+    b = pd.Series(grid[1:,:].ravel(order='F'))
+    pi = pd.Series((np.tile(g[0], (2, 1)) / 2).ravel(order='F'))
+    fit1 = ashr.ash_pois(
       pd.Series(x), pd.Series(s),
-      g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])),
+      g=ashr.unimix(pi, a, b),
       **kwargs)
-    update = fit.rx2('loglik')[0]
+    update = fit1.rx2('loglik')[0]
     if update < obj:
-      raise RuntimeError('llik decreased')
+      raise RuntimeError('loglik decreased')
     elif update - obj < tol:
-      return fit
+      return fit1
     else:
       obj = update
+      fit = fit1
   else:
     raise RuntimeError('failed to find acceptable grid in max_grid_updates')
