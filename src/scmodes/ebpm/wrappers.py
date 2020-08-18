@@ -298,7 +298,9 @@ arbitrary distribution on non-negative reals
       **kwargs)
     update = fit1.rx2('loglik')[0]
     if update < obj:
-      if obj - update < tol:
+      if obj - update < 1e-3:
+        # TODO: is the log likelihood worse after splitting segments just
+        # because of propagation of numerical errors?
         return fit
       else:
         raise RuntimeError('loglik decreased')

@@ -1,6 +1,7 @@
 import functools as ft
 import numpy as np
 import pandas as pd
+import rpy2.robjects
 import rpy2.robjects.packages
 import scipy.stats as st
 import scmodes
@@ -40,10 +41,16 @@ model for one gene
   if np.isclose(lam.min(), lam.max()):
     return _llik_point(k, x.A.ravel(), s)
   else:
-    res = scmodes.ebpm.ebpm_unimodal(x.A.ravel(), s)
+    # Important: low rank approximation of the mixture component log likelihood
+    # matrix is broken in mixsqp, so disable it here
+    res = scmodes.ebpm.ebpm_unimodal(
+      x.A.ravel(),
+      s,
+      outputlevel='loglik',
+      control=rpy2.robjects.ListVector({'tol.svd': 0}))
     return k, np.array(res.rx2('loglik'))[0]
 
-def _llik_npmle(k, x, s, **kwargs):
+def _llik_npmle(k, x, s, K, max_grid_updates, tol, thresh, **kwargs):
   """Return marginal likelihood assuming non-parametric expression model for one
 gene
 
@@ -53,7 +60,17 @@ gene
   if np.isclose(lam.min(), lam.max()):
     return _llik_point(k, x.A.ravel(), s)
   else:
-    res = scmodes.ebpm.ebpm_npmle(x.A.ravel(), s)
+    # Important: low rank approximation of the mixture component log likelihood
+    # matrix is broken in mixsqp, so disable it here
+    res = scmodes.ebpm.ebpm_npmle(
+      x.A.ravel(),
+      s,
+      K=K,
+      max_grid_updates=max_grid_updates,
+      tol=tol,
+      thresh=thresh,
+      outputlevel='loglik',
+      control=rpy2.robjects.ListVector({'tol.svd': 0}))
     return k, np.array(res.rx2('loglik'))[0]
 
 def _map_llik(f, x, s=None, pool=None, **kwargs):
@@ -123,7 +140,7 @@ for each column of x
   """
   return _map_llik(_llik_unimodal, x, s, pool)
   
-def llik_npmle(x, s=None, pool=None, **kwargs):
+def llik_npmle(x, s=None, pool=None, K=512, max_grid_updates=100, tol=1e-7, thresh=1e-8, **kwargs):
   """Return marginal log likelihood of non-parametric expression model for each
 column of x
 
@@ -131,7 +148,8 @@ column of x
   s - size factor (n,) (default: total molecules per sample)
 
   """
-  return _map_llik(_llik_npmle, x, s, pool)
+  return _map_llik(_llik_npmle, x, s, pool, K=K,
+                   max_grid_updates=max_grid_updates, tol=tol, thresh=thresh)
 
 def evaluate_llik(x, methods, **kwargs):
   result = {}
