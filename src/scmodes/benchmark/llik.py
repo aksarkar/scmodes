@@ -69,7 +69,7 @@ gene
       max_grid_updates=max_grid_updates,
       tol=tol,
       thresh=thresh,
-      outputlevel='loglik',
+      outputlevel=pd.Series(['loglik', 'fitted_g']),
       control=rpy2.robjects.ListVector({'tol.svd': 0}))
     return k, np.array(res.rx2('loglik'))[0]
 
