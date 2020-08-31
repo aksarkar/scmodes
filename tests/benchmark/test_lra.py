@@ -38,8 +38,8 @@ def test_train_test_split_df(simulate):
   train, test = scmodes.benchmark.train_test_split(x)
   assert train.shape == x.shape
   assert test.shape == x.shape
-  assert isinstance(train, pd.DataFrame)
-  assert isinstance(test, pd.DataFrame)
+  assert isinstance(train, np.ndarray)
+  assert isinstance(test, np.ndarray)
 
 def test_train_test_split_sparse_csr(simulate_holdout):
   x, eta = simulate_holdout
@@ -47,8 +47,8 @@ def test_train_test_split_sparse_csr(simulate_holdout):
   train, test = scmodes.benchmark.train_test_split(x)
   assert train.shape == x.shape
   assert test.shape == x.shape
-  assert ss.isspmatrix_csr(train)
-  assert ss.isspmatrix_csr(test)
+  assert not ss.isspmatrix(train)
+  assert not ss.isspmatrix(test)
 
 def test_train_test_split_sparse_csc(simulate_holdout):
   x, eta = simulate_holdout
@@ -56,8 +56,8 @@ def test_train_test_split_sparse_csc(simulate_holdout):
   train, test = scmodes.benchmark.train_test_split(x)
   assert train.shape == x.shape
   assert test.shape == x.shape
-  assert ss.isspmatrix_csc(train)
-  assert ss.isspmatrix_csc(test)
+  assert not ss.isspmatrix(train)
+  assert not ss.isspmatrix(test)
 
 def test_generalization_score_nmf(simulate_train_test):
   train, test, eta = simulate_train_test
