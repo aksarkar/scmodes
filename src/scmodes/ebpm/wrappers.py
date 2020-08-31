@@ -262,7 +262,7 @@ spline
   return descend.deconvSingle(pd.Series(x), scaling_consts=pd.Series(s),
                               do_LRT_test=False, plot_density=False, verbose=False)
 
-def ebpm_npmle(x, s, K=512, max_grid_updates=40, tol=1e-7, thresh=1e-8, **kwargs):
+def ebpm_npmle(x, s, K=512, max_grid_updates=40, tol=1e-7, thresh=1e-8, verbose=False, **kwargs):
   """Return fitted parameters and marginal log likelihood assuming g is an
 arbitrary distribution on non-negative reals
 
@@ -283,6 +283,11 @@ arbitrary distribution on non-negative reals
     g=ashr.unimix(pd.Series(np.ones(K) / K), pd.Series(grid[:-1]), pd.Series(grid[1:])),
     **kwargs)
   obj = fit.rx2('loglik')[0]
+  if not max_grid_updates:
+    return fit
+  if verbose:
+    print(f'iter {"obj":>15s} {"K":>4s} {"upd":>4s}')
+    print(f'{0:>4d} {obj:>15.12g} {K:4d}')
   for i in range(max_grid_updates):
     g = np.array(fit.rx2('fitted_g'))
     g = g[:,g[0] > thresh]
@@ -296,7 +301,14 @@ arbitrary distribution on non-negative reals
       pd.Series(x), pd.Series(s),
       g=ashr.unimix(pi, a, b),
       **kwargs)
+    g1 = np.array(fit1.rx2('fitted_g'))
+    g1 = g1[:,g1[0] > thresh]
+    if g1.shape[1] == 2 * g.shape[1]:
+      # HACK: give up trying to improve
+      return fit1
     update = fit1.rx2('loglik')[0]
+    if verbose:
+      print(f'{i + 1:>4d} {update:>15.12g} {g.shape[1]:>4d} {g1.shape[1]:>4d}')
     if update < obj:
       if obj - update < 1e-3:
         # TODO: is the log likelihood worse after splitting segments just

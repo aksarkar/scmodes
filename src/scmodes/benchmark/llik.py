@@ -50,11 +50,13 @@ model for one gene
       control=rpy2.robjects.ListVector({'tol.svd': 0}))
     return k, np.array(res.rx2('loglik'))[0]
 
-def _llik_npmle(k, x, s, K, max_grid_updates, tol, thresh, **kwargs):
+def _llik_npmle(k, x, s, K, max_grid_updates, tol, thresh, verbose, **kwargs):
   """Return marginal likelihood assuming non-parametric expression model for one
 gene
 
   """
+  if verbose:
+    print(f'fitting {k}')
   ashr = rpy2.robjects.packages.importr('ashr')
   lam = x.A.ravel() / s
   if np.isclose(lam.min(), lam.max()):
@@ -69,6 +71,7 @@ gene
       max_grid_updates=max_grid_updates,
       tol=tol,
       thresh=thresh,
+      verbose=verbose,
       outputlevel=pd.Series(['loglik', 'fitted_g']),
       control=rpy2.robjects.ListVector({'tol.svd': 0}))
     return k, np.array(res.rx2('loglik'))[0]
@@ -140,7 +143,8 @@ for each column of x
   """
   return _map_llik(_llik_unimodal, x, s, pool)
   
-def llik_npmle(x, s=None, pool=None, K=512, max_grid_updates=100, tol=1e-7, thresh=1e-8, **kwargs):
+def llik_npmle(x, s=None, pool=None, K=512, max_grid_updates=100, tol=1e-7,
+               thresh=1e-8, verbose=False, **kwargs):
   """Return marginal log likelihood of non-parametric expression model for each
 column of x
 
@@ -149,7 +153,8 @@ column of x
 
   """
   return _map_llik(_llik_npmle, x, s, pool, K=K,
-                   max_grid_updates=max_grid_updates, tol=tol, thresh=thresh)
+                   max_grid_updates=max_grid_updates, tol=tol, thresh=thresh,
+                   verbose=verbose)
 
 def evaluate_llik(x, methods, **kwargs):
   result = {}
