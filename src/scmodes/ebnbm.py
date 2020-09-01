@@ -16,20 +16,21 @@ def _check_args(x, s):
     s = np.ones(n) * s
   return x, s
 
-def _ebnbm_gamma_unpack(theta, p):
-  a = theta[:p].reshape(1, -1)
-  b = theta[p:-1].reshape(1, -1)
-  alpha = theta[-1]
-  return a, b, alpha
+def _ebnbm_gamma_unpack(par, p):
+  a = par[:p].reshape(1, -1)
+  b = par[p:-1].reshape(1, -1)
+  theta = par[-1]
+  return a, b, theta
 
 def _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta, **kwargs):
   """Return ELBO (up to a constant)"""
   a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
+  eta = 1 / theta
   return ((x + a - alpha) * (sp.digamma(alpha) - np.log(beta)) - (b - beta) * (alpha / beta)
-          + (x + theta - gamma) * (sp.digamma(gamma) - np.log(delta)) - (theta - delta) * (gamma / delta)
+          + (x + eta - gamma) * (sp.digamma(gamma) - np.log(delta)) - (eta - delta) * (gamma / delta)
           - s * (alpha / beta) * (gamma / delta)
-          + a * np.log(b) + theta * np.log(theta) - alpha * np.log(beta) - gamma * np.log(delta)
-          - sp.gammaln(a) - sp.gammaln(theta) + sp.gammaln(alpha) + sp.gammaln(gamma)).sum()
+          + a * np.log(b) + eta * np.log(eta) - alpha * np.log(beta) - gamma * np.log(delta)
+          - sp.gammaln(a) - sp.gammaln(eta) + sp.gammaln(alpha) + sp.gammaln(gamma)).sum()
 
 def _ebnbm_gamma_update_a_j(init, b_j, plm, step=1, c=0.5, tau=0.5, max_iters=30):
   """Backtracking line search to select step size for Newton-Raphson update of
@@ -51,7 +52,7 @@ def _ebnbm_gamma_update_a_j(init, b_j, plm, step=1, c=0.5, tau=0.5, max_iters=30
   else:
     return init + step * d
 
-def _ebnbm_gamma_update_theta(init, pm, plm, step=1, c=0.5, tau=0.5, max_iters=30):
+def _ebnbm_gamma_update_eta(init, pm, plm, step=1, c=0.5, tau=0.5, max_iters=30):
   """Backtracking line search to select step size for Newton-Raphson update of
   theta
 
@@ -74,17 +75,25 @@ def _ebnbm_gamma_update_theta(init, pm, plm, step=1, c=0.5, tau=0.5, max_iters=3
 def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_theta):
   n, p = x.shape
   a, b, theta = _ebnbm_gamma_unpack(par, p)
+  eta = 1 / theta
+  l0 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
   # Important: we need to thread this through VBEM updates
   alpha[...] = x + a
   beta[...] = s * (gamma / delta) + b
-  gamma[...] = x + theta
-  delta[...] = s * (alpha / beta) + theta
+  gamma[...] = x + eta
+  delta[...] = s * (alpha / beta) + eta
+  l1 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
+  assert l1 >= l0
   if not fix_theta:
     b = a / (alpha / beta).mean(axis=0)
-    theta = _ebnbm_gamma_update_theta(theta, gamma / delta, sp.digamma(gamma) - np.log(delta))
+    # Important: update is simpler wrt 1 / theta
+    eta = _ebnbm_gamma_update_eta(eta, gamma / delta, sp.digamma(gamma) - np.log(delta))
     for j in range(x.shape[1]):
       a[0,j] = _ebnbm_gamma_update_a_j(a[0,j], b[0,j], sp.digamma(alpha[:,j]) - np.log(beta[:,j]))
-  return np.hstack([a.ravel(), b.ravel(), theta])
+  l2 = _ebnbm_gamma_obj(np.hstack([a.ravel(), b.ravel(), 1 / eta]), x, s, alpha, beta, gamma, delta)
+  assert l2 >= l1
+  print(1 / eta)
+  return np.hstack([a.ravel(), b.ravel(), 1 / eta])
 
 def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True, fix_theta=True):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
@@ -97,6 +106,7 @@ def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True, fi
 
   """
   x, s = _check_args(x, s)
+  # Important: theta is NB dispersion => 1 / theta is Gamma shape
   if init is None:
     init = np.hstack([1e-3 * np.ones(x.shape[1]), (s.sum() / x.sum(axis=0)), 1e-3])
   else:
