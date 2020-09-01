@@ -22,7 +22,7 @@ def _ebnbm_gamma_unpack(theta, p):
   alpha = theta[-1]
   return a, b, alpha
 
-def _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta):
+def _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta, **kwargs):
   """Return ELBO (up to a constant)"""
   a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
   return ((x + a - alpha) * (sp.digamma(alpha) - np.log(beta)) - (b - beta) * (alpha / beta)
@@ -71,25 +71,22 @@ def _ebnbm_gamma_update_theta(init, pm, plm, step=1, c=0.5, tau=0.5, max_iters=3
   else:
     return init + step * d
 
-def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta):
+def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_theta):
   n, p = x.shape
   a, b, theta = _ebnbm_gamma_unpack(par, p)
-  l0 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
   # Important: we need to thread this through VBEM updates
   alpha[...] = x + a
   beta[...] = s * (gamma / delta) + b
   gamma[...] = x + theta
   delta[...] = s * (alpha / beta) + theta
-  l1 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
-  assert np.isfinite(l1)
-  assert l1 >= l0
-  b = a / (alpha / beta).mean(axis=0)
-  theta = _ebnbm_gamma_update_theta(theta, gamma / delta, sp.digamma(gamma) - np.log(delta))
-  for j in range(x.shape[1]):
-    a[0,j] = _ebnbm_gamma_update_a_j(a[0,j], b[0,j], sp.digamma(alpha[:,j]) - np.log(beta[:,j]))
+  if not fix_theta:
+    b = a / (alpha / beta).mean(axis=0)
+    theta = _ebnbm_gamma_update_theta(theta, gamma / delta, sp.digamma(gamma) - np.log(delta))
+    for j in range(x.shape[1]):
+      a[0,j] = _ebnbm_gamma_update_a_j(a[0,j], b[0,j], sp.digamma(alpha[:,j]) - np.log(beta[:,j]))
   return np.hstack([a.ravel(), b.ravel(), theta])
 
-def ebnbm_gamma(x, s, alpha=1e-3, num_samples=1000, max_iters=10000, tol=1e-3, extrapolate=True, verbose=False):
+def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True, fix_theta=True):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
   distribution
 
@@ -97,23 +94,25 @@ def ebnbm_gamma(x, s, alpha=1e-3, num_samples=1000, max_iters=10000, tol=1e-3, e
 
   x - array-like [n,]
   s - array-like [n,]
-  alpha - initial guess for alpha
 
   """
   x, s = _check_args(x, s)
-  init = np.hstack([np.ones(x.shape[1]), (s.sum() / x.sum(axis=0)), alpha])
+  if init is None:
+    init = np.hstack([1e-3 * np.ones(x.shape[1]), (s.sum() / x.sum(axis=0)), 1e-3])
+  else:
+    assert init.shape == (2 * x.shape[1] + 1,)
   # Important: these get passed by ref to thread through (SQUAR)EM
   alpha = np.ones(x.shape)
   beta = np.ones(x.shape)
   gamma = np.ones(x.shape)
   delta = np.ones(x.shape)
   if extrapolate:
-    theta, elbo = _squarem(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x,
-                           s=s, alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-                           max_iters=max_iters, tol=tol)
+    par, elbo = _squarem(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
+                         alpha=alpha, beta=beta, gamma=gamma, delta=delta,
+                         fix_theta=fix_theta, max_iters=max_iters, tol=tol)
   else:
-    theta, elbo = _em(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
-                      alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-                      max_iters=max_iters, tol=tol, verbose=verbose)
-  a, b, alpha = _ebnbm_gamma_unpack(theta, x.shape[1])
-  return np.log(a) - np.log(b), np.log(a), np.log(alpha), elbo
+    par, elbo = _em(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
+                    alpha=alpha, beta=beta, gamma=gamma, delta=delta,
+                    fix_theta=fix_theta, max_iters=max_iters, tol=tol)
+  a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
+  return np.log(a) - np.log(b), np.log(a), np.log(theta), alpha, beta, gamma, delta, elbo
