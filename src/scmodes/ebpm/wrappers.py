@@ -41,9 +41,12 @@ mass
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
-def _em(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
+def _em(init, objective_fn, update_fn, max_iters, tol, verbose=False, *args, **kwargs):
   theta = init.copy()
   obj = objective_fn(theta, *args, **kwargs)
+  if verbose:
+    print(f'iter {"obj":>15}')
+    print(f'{0:>4d} {obj:>15.12g}')
   for i in range(max_iters):
     theta = update_fn(theta, *args, **kwargs)
     update = objective_fn(theta, *args, **kwargs)
@@ -57,6 +60,8 @@ def _em(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
     elif diff < tol:
       return theta, update
     else:
+      if verbose:
+        print(f'{i+1:>4d} {update:>15.12g}')
       obj = update
   else:
     raise RuntimeError(f'failed to converge in max_iters ({diff:.4g} > {tol:.4g})')
