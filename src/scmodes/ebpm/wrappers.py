@@ -52,12 +52,18 @@ def _em(init, objective_fn, update_fn, max_iters, tol, verbose=False, *args, **k
     update = objective_fn(theta, *args, **kwargs)
     diff = update - obj
     if i == 0 and diff < 0:
+      if verbose:
+        raise RuntimeError('llik decreased')
       # Hack: this is needed for numerical reasons, because in e.g.,
       # ebpm_gamma, a point mass is the limit as b → ∞
       return init, obj
+    elif not np.isfinite(update):
+      raise RuntimeError('Non-finite objective')
     elif diff < 0:
       raise RuntimeError('llik decreased')
     elif diff < tol:
+      if verbose:
+        print(f'converged in {i+1} iterations')
       return theta, update
     else:
       if verbose:

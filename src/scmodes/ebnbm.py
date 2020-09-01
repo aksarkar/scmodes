@@ -22,12 +22,14 @@ def _ebnbm_gamma_unpack(theta, p):
   alpha = theta[-1]
   return a, b, alpha
 
-def _ebnbm_gamma_obj(theta, x, s, mu, mu_plm, u, u_plm):
-  """Return log joint probability"""
-  a, b, alpha = _ebnbm_gamma_unpack(theta, x.shape[1])
-  return (x * (np.log(s) + mu_plm + u_plm) - s * mu * u
-          + (a - 1) * mu_plm - b * mu + a * np.log(b) - sp.gammaln(a)
-          + (alpha - 1) * u_plm - alpha * u + alpha * np.log(alpha) - sp.gammaln(alpha)).sum()
+def _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta):
+  """Return ELBO (up to a constant)"""
+  a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
+  return ((x + a - alpha) * (sp.digamma(alpha) - np.log(beta)) - (b - beta) * (alpha / beta)
+          + (x + theta - gamma) * (sp.digamma(gamma) - np.log(delta)) - (theta - delta) * (gamma / delta)
+          - s * (alpha / beta) * (gamma / delta)
+          + a * np.log(b) + theta * np.log(theta) - alpha * np.log(beta) - gamma * np.log(delta)
+          - sp.gammaln(a) - sp.gammaln(theta) + sp.gammaln(alpha) + sp.gammaln(gamma)).sum()
 
 def _ebnbm_gamma_update_a_j(init, b_j, plm, step=1, c=0.5, tau=0.5, max_iters=30):
   """Backtracking line search to select step size for Newton-Raphson update of
@@ -49,25 +51,49 @@ def _ebnbm_gamma_update_a_j(init, b_j, plm, step=1, c=0.5, tau=0.5, max_iters=30
   else:
     return init + step * d
 
-def _ebnbm_gamma_update(theta, x, s, mu, mu_plm, u, u_plm):
-  n, p = x.shape
-  a, b, alpha = _ebnbm_gamma_unpack(theta, p)
-  b = a / mu.mean(axis=0)
-  alpha = n * p / u.sum()
-  for j in range(x.shape[1]):
-    a[0,j] = _ebnbm_gamma_update_a_j(a[0,j], b[0,j], mu_plm[:,j])
-  # Important: we need to thread this through (SQUAR)EM updates
-  mu[...] = (x + a) / (s * u + b)
-  mu_plm[...] = sp.digamma(x + a) - np.log(s * u + b)
-  u[...] = (x + alpha) / (s * mu + alpha)
-  u_plm[...] = sp.digamma(x + alpha) - np.log(s * mu + alpha)
-  return np.hstack([a.ravel(), b.ravel(), alpha])
+def _ebnbm_gamma_update_theta(init, pm, plm, step=1, c=0.5, tau=0.5, max_iters=30):
+  """Backtracking line search to select step size for Newton-Raphson update of
+  theta
 
-def ebnbm_gamma(x, s, alpha=1e-3, num_samples=1000, max_iters=10000, tol=1e-3, extrapolate=True):
+  """
+  def loss(a):
+    return -(a * np.log(a) + a * plm - a * pm - sp.gammaln(a)).sum()
+  obj = loss(init)
+  d = (1 + plm - pm - sp.digamma(init)).mean() / sp.polygamma(1, init)
+  update = loss(init + step * d)
+  while (not np.isfinite(update) or update > obj + c * step * d) and max_iters > 0:
+    step *= tau
+    update = loss(init + step * d)
+    max_iters -= 1
+  if max_iters == 0:
+    # Step size is small enough that update can be skipped
+    return init
+  else:
+    return init + step * d
+
+def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta):
+  n, p = x.shape
+  a, b, theta = _ebnbm_gamma_unpack(par, p)
+  l0 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
+  # Important: we need to thread this through VBEM updates
+  alpha[...] = x + a
+  beta[...] = s * (gamma / delta) + b
+  gamma[...] = x + theta
+  delta[...] = s * (alpha / beta) + theta
+  l1 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
+  assert np.isfinite(l1)
+  assert l1 >= l0
+  b = a / (alpha / beta).mean(axis=0)
+  theta = _ebnbm_gamma_update_theta(theta, gamma / delta, sp.digamma(gamma) - np.log(delta))
+  for j in range(x.shape[1]):
+    a[0,j] = _ebnbm_gamma_update_a_j(a[0,j], b[0,j], sp.digamma(alpha[:,j]) - np.log(beta[:,j]))
+  return np.hstack([a.ravel(), b.ravel(), theta])
+
+def ebnbm_gamma(x, s, alpha=1e-3, num_samples=1000, max_iters=10000, tol=1e-3, extrapolate=True, verbose=False):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
   distribution
 
-  Returns log mu and -log phi
+  Returns log mu, -log phi, log theta
 
   x - array-like [n,]
   s - array-like [n,]
@@ -77,20 +103,17 @@ def ebnbm_gamma(x, s, alpha=1e-3, num_samples=1000, max_iters=10000, tol=1e-3, e
   x, s = _check_args(x, s)
   init = np.hstack([np.ones(x.shape[1]), (s.sum() / x.sum(axis=0)), alpha])
   # Important: these get passed by ref to thread through (SQUAR)EM
-  mu = (x / s).astype(float)
-  mu_plm = np.log(x + 1) - np.log(s)
-  u = np.ones(x.shape)
-  u_plm = np.zeros(x.shape)
+  alpha = np.ones(x.shape)
+  beta = np.ones(x.shape)
+  gamma = np.ones(x.shape)
+  delta = np.ones(x.shape)
   if extrapolate:
-    theta, _ = _squarem(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x,
-                           s=s, mu=mu, mu_plm=mu_plm, u=u, u_plm=u_plm,
+    theta, elbo = _squarem(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x,
+                           s=s, alpha=alpha, beta=beta, gamma=gamma, delta=delta,
                            max_iters=max_iters, tol=tol)
   else:
-    theta, _ = _em(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
-                      mu=mu, mu_plm=mu_plm, u=u, u_plm=u_plm,
-                      max_iters=max_iters, tol=tol)
+    theta, elbo = _em(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
+                      alpha=alpha, beta=beta, gamma=gamma, delta=delta,
+                      max_iters=max_iters, tol=tol, verbose=verbose)
   a, b, alpha = _ebnbm_gamma_unpack(theta, x.shape[1])
-  # Monte Carlo integral for llik
-  mu = st.gamma(a=a, scale=1 / b).rvs(size=(num_samples, 1, x.shape[1]))
-  llik = st.nbinom(n=1 / alpha, p=1 / (1 + s * mu * alpha)).logpmf(x).mean(axis=0).sum()
-  return np.log(a) - np.log(b), np.log(a), np.log(alpha), llik
+  return np.log(a) - np.log(b), np.log(a), np.log(alpha), elbo
