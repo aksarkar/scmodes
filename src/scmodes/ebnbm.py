@@ -72,7 +72,7 @@ def _ebnbm_gamma_update_eta(init, pm, plm, step=1, c=0.5, tau=0.5, max_iters=30)
   else:
     return init + step * d
 
-def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_theta):
+def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_g, fix_theta):
   n, p = x.shape
   a, b, theta = _ebnbm_gamma_unpack(par, p)
   eta = 1 / theta
@@ -84,18 +84,19 @@ def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_theta):
   delta[...] = s * (alpha / beta) + eta
   l1 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
   assert l1 >= l0
-  if not fix_theta:
+  if not fix_g:
     b = a / (alpha / beta).mean(axis=0)
-    # Important: update is simpler wrt 1 / theta
-    eta = _ebnbm_gamma_update_eta(eta, gamma / delta, sp.digamma(gamma) - np.log(delta))
     for j in range(x.shape[1]):
       a[0,j] = _ebnbm_gamma_update_a_j(a[0,j], b[0,j], sp.digamma(alpha[:,j]) - np.log(beta[:,j]))
+  if not fix_theta:
+    # Important: update is simpler wrt 1 / theta
+    eta = _ebnbm_gamma_update_eta(eta, gamma / delta, sp.digamma(gamma) - np.log(delta))
   l2 = _ebnbm_gamma_obj(np.hstack([a.ravel(), b.ravel(), 1 / eta]), x, s, alpha, beta, gamma, delta)
   assert l2 >= l1
-  print(1 / eta)
   return np.hstack([a.ravel(), b.ravel(), 1 / eta])
 
-def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True, fix_theta=True):
+def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True,
+                fix_g=False, fix_theta=True):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
   distribution
 
@@ -119,10 +120,14 @@ def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True, fi
   if extrapolate:
     par, elbo = _squarem(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
                          alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-                         fix_theta=fix_theta, max_iters=max_iters, tol=tol)
+                         fix_g=fix_g, fix_theta=fix_theta, max_iters=max_iters,
+                         tol=tol)
   else:
     par, elbo = _em(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
                     alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-                    fix_theta=fix_theta, max_iters=max_iters, tol=tol)
+                    fix_g=fix_g, fix_theta=fix_theta, max_iters=max_iters,
+                    tol=tol)
+  # Add back the constant that was left out for computational efficiency
+  elbo += (x * np.log(s) - sp.gammaln(x + 1)).sum()
   a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
   return np.log(a) - np.log(b), np.log(a), np.log(theta), alpha, beta, gamma, delta, elbo
