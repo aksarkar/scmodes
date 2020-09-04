@@ -71,7 +71,9 @@ def test_llik_unimodal(test_adata):
 
 def test__llik_npmle(test_adata_one_gene):
   gene, xj, size = test_adata_one_gene
-  k, llik = scmodes.benchmark.llik._llik_npmle(gene, xj, size)
+  k, llik = scmodes.benchmark.llik._llik_npmle(
+    gene, xj, size, K=512, max_grid_updates=20, tol=1e-5, thresh=1e-8,
+    verbose=False)
   assert k == gene
   assert np.isscalar(llik)
   assert np.isfinite(llik)

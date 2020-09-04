@@ -48,7 +48,7 @@ def test_ebnbm_gamma_em_nb_measurement(simulate_nb_gamma):
   x, s, log_mu, log_phi, theta = simulate_nb_gamma
   init = np.hstack([np.exp(-log_phi).ravel(), np.exp(-log_phi - log_mu).ravel(), theta])
   log_mu_hat, log_phi_hat, log_theta_hat, alpha, beta, gamma, delta, elbo = scmodes.ebnbm.ebnbm_gamma(
-    x, s, init=init, tol=1e-5, extrapolate=False)
+    x, s, init=init, tol=1e-3, extrapolate=False)
   assert log_mu_hat.shape == log_mu.shape
   assert np.isfinite(log_mu_hat).all()
   assert log_phi_hat.shape == log_phi.shape
@@ -128,7 +128,7 @@ def test_ebnbm_gamma_squarem_nb_measurement(simulate_nb_gamma):
   x, s, log_mu, log_phi, theta = simulate_nb_gamma
   init = np.hstack([np.exp(-log_phi).ravel(), np.exp(-log_phi - log_mu).ravel(), theta])
   log_mu_hat, log_phi_hat, log_theta_hat, alpha, beta, gamma, delta, elbo = scmodes.ebnbm.ebnbm_gamma(
-    x, s, init=init, max_iters=20_000, tol=1e-4, extrapolate=True)
+    x, s, init=init, tol=1e-3, extrapolate=True)
   assert log_mu_hat.shape == log_mu.shape
   assert np.isfinite(log_mu_hat).all()
   assert log_phi_hat.shape == log_phi.shape
