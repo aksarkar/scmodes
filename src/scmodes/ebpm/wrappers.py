@@ -86,8 +86,9 @@ distribution
 
   """
   x, s = _check_args(x, s)
+  log_mean0, llik0 = ebpm_point(x, s)
   # a = 1 / phi; b = 1 / (mu phi)
-  # Initialize at the Poisson MLE
+  # Initialize mean at the Poisson MLE
   init = np.array([1, s.sum() / x.sum()])
   if extrapolate:
     theta, llik = _squarem(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
@@ -95,10 +96,9 @@ distribution
   else:
     theta, llik = _em(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
                       max_iters=max_iters, tol=tol)
-  if np.isclose(theta, init).all():
-    # First EM update rejected, so just use the point mass model
-    log_mean, llik = ebpm_point(x, s)
-    return log_mean, np.inf, llik
+  if llik < llik0:
+    # Just use the point mass model
+    return log_mean0, np.inf, llik0
   else:
     a, b = theta
     return np.log(a) - np.log(b), np.log(a), llik
