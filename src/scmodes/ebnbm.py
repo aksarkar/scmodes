@@ -4,8 +4,7 @@
 import numpy as np
 import scipy.special as sp
 import scipy.stats as st
-
-from scmodes.ebpm.wrappers import _em, _squarem
+import scmodes.em
 
 def _check_args(x, s):
   n, p = x.shape
@@ -118,15 +117,17 @@ def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True,
   gamma = np.ones(x.shape)
   delta = np.ones(x.shape)
   if extrapolate:
-    par, elbo = _squarem(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
-                         alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-                         fix_g=fix_g, fix_theta=fix_theta, max_iters=max_iters,
-                         tol=tol)
+    par, elbo = scmodes.em.squarem(
+      init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
+      alpha=alpha, beta=beta, gamma=gamma, delta=delta,
+      fix_g=fix_g, fix_theta=fix_theta, max_iters=max_iters,
+      tol=tol)
   else:
-    par, elbo = _em(init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
-                    alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-                    fix_g=fix_g, fix_theta=fix_theta, max_iters=max_iters,
-                    tol=tol)
+    par, elbo = scmodes.em.em(
+      init, _ebnbm_gamma_obj, _ebnbm_gamma_update, x=x, s=s,
+      alpha=alpha, beta=beta, gamma=gamma, delta=delta,
+      fix_g=fix_g, fix_theta=fix_theta, max_iters=max_iters,
+      tol=tol)
   # Add back the constant that was left out for computational efficiency
   elbo += (x * np.log(s) - sp.gammaln(x + 1)).sum()
   a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
