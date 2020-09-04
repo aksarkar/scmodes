@@ -23,6 +23,8 @@ def _ebnbm_gamma_unpack(par, p):
 
 def _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta, **kwargs):
   """Return ELBO (up to a constant)"""
+  if (par <= 0).any():
+    return -np.inf
   a, b, theta = _ebnbm_gamma_unpack(par, x.shape[1])
   eta = 1 / theta
   return ((x + a - alpha) * (sp.digamma(alpha) - np.log(beta)) - (b - beta) * (alpha / beta)
@@ -37,6 +39,8 @@ def _ebnbm_gamma_update_a_j(init, b_j, plm, step=1, c=0.5, tau=0.5, max_iters=30
 
   """
   def loss(a):
+    if a <= 0:
+      return np.inf
     return -(a * np.log(b_j) + a * plm - sp.gammaln(a)).sum()
   obj = loss(init)
   d = (np.log(b_j) - sp.digamma(init) + plm).mean() / sp.polygamma(1, init)
@@ -75,14 +79,11 @@ def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_g, fix_theta):
   n, p = x.shape
   a, b, theta = _ebnbm_gamma_unpack(par, p)
   eta = 1 / theta
-  l0 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
   # Important: we need to thread this through VBEM updates
   alpha[...] = x + a
   beta[...] = s * (gamma / delta) + b
   gamma[...] = x + eta
   delta[...] = s * (alpha / beta) + eta
-  l1 = _ebnbm_gamma_obj(par, x, s, alpha, beta, gamma, delta)
-  assert l1 >= l0
   if not fix_g:
     b = a / (alpha / beta).mean(axis=0)
     for j in range(x.shape[1]):
@@ -90,8 +91,6 @@ def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_g, fix_theta):
   if not fix_theta:
     # Important: update is simpler wrt 1 / theta
     eta = _ebnbm_gamma_update_eta(eta, gamma / delta, sp.digamma(gamma) - np.log(delta))
-  l2 = _ebnbm_gamma_obj(np.hstack([a.ravel(), b.ravel(), 1 / eta]), x, s, alpha, beta, gamma, delta)
-  assert l2 >= l1
   return np.hstack([a.ravel(), b.ravel(), 1 / eta])
 
 def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True,
@@ -101,16 +100,22 @@ def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True,
 
   Returns log mu, -log phi, log theta
 
-  x - array-like [n,]
-  s - array-like [n,]
+  x - array-like [n, p]
+  s - array-like [n, 1]
+  init - array-like [2 * p + 1,]
 
   """
   x, s = _check_args(x, s)
-  # Important: theta is NB dispersion => 1 / theta is Gamma shape
   if init is None:
-    init = np.hstack([1e-3 * np.ones(x.shape[1]), (s.sum() / x.sum(axis=0)), 1e-3])
-  else:
-    assert init.shape == (2 * x.shape[1] + 1,)
+    # Important: theta is NB dispersion => 1 / theta is Gamma shape. We need to
+    # handle np.inf returned from ebpm_gamma
+    par = np.array([scmodes.ebpm.ebpm_gamma(x[:,j], s.ravel()) for j in range(x.shape[1])])
+    init = np.ma.masked_invalid(np.hstack([np.exp(par[:,1]), np.exp(par[:,1] - par[:,0]), 1e-3])).filled(1e6)
+    assert np.isfinite(init).all()
+  elif init.shape != (2 * x.shape[1] + 1,):
+    raise ValueError(f'shape mismatch (init): expected {(2 * x.shape[1] + 1,)}, got {init.shape}')
+  elif not np.isfinite(init).all():
+    raise ValueError(f'invalid value(s) in init')
   # Important: these get passed by ref to thread through (SQUAR)EM
   alpha = np.ones(x.shape)
   beta = np.ones(x.shape)
