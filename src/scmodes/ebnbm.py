@@ -93,6 +93,16 @@ def _ebnbm_gamma_update(par, x, s, alpha, beta, gamma, delta, fix_g, fix_theta):
     eta = _ebnbm_gamma_update_eta(eta, gamma / delta, sp.digamma(gamma) - np.log(delta))
   return np.hstack([a.ravel(), b.ravel(), 1 / eta])
 
+def ebnbm_init(x, s, theta):
+  """Return initial values for the expression model hyperparameters"""
+  par = np.array([scmodes.ebpm.ebpm_gamma(x[:,j], s.ravel()) for j in range(x.shape[1])])
+  # Important: theta is NB dispersion => 1 / theta is Gamma shape
+  #
+  # We need to handle np.inf returned from ebpm_gamma. exp(20) is large enough
+  # and finite
+  par = np.ma.masked_invalid(par).filled(20)
+  return np.hstack([np.exp(par[:,1]), np.exp(par[:,1] - par[:,0]), theta])
+
 def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True,
                 fix_g=False, fix_theta=True):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
@@ -107,11 +117,10 @@ def ebnbm_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True,
   """
   x, s = _check_args(x, s)
   if init is None:
-    # Important: theta is NB dispersion => 1 / theta is Gamma shape. We need to
-    # handle np.inf returned from ebpm_gamma
-    par = np.array([scmodes.ebpm.ebpm_gamma(x[:,j], s.ravel()) for j in range(x.shape[1])])
-    init = np.ma.masked_invalid(np.hstack([np.exp(par[:,1]), np.exp(par[:,1] - par[:,0]), 1e-3])).filled(1e6)
-    assert np.isfinite(init).all()
+    if not fix_g and not fix_theta:
+      init = ebnbm_init(x, s, 1e-3)
+    else:
+      raise ValueError(f'init must be specified if fix_g or fix_theta')
   elif init.shape != (2 * x.shape[1] + 1,):
     raise ValueError(f'shape mismatch (init): expected {(2 * x.shape[1] + 1,)}, got {init.shape}')
   elif not np.isfinite(init).all():
