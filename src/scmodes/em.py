@@ -24,7 +24,7 @@ def em(init, objective_fn, update_fn, max_iters, tol, *args, **kwargs):
   else:
     raise RuntimeError(f'failed to converge in max_iters ({diff:.4g} > {tol:.4g})')
 
-def squarem(init, objective_fn, update_fn, max_iters, tol, max_step_updates=10, *args, **kwargs):
+def squarem(init, objective_fn, update_fn, max_iters, tol, par_tol=1e-8, max_step_updates=10, *args, **kwargs):
   """Squared extrapolation scheme for accelerated EM
 
   Reference: 
@@ -45,7 +45,7 @@ def squarem(init, objective_fn, update_fn, max_iters, tol, max_step_updates=10, 
       return init, obj
     x2 = update_fn(x1, *args, **kwargs)
     v = (x2 - x1) - r
-    if np.linalg.norm(v) < tol:
+    if np.linalg.norm(v) < par_tol:
       return x2, objective_fn(x2, *args, **kwargs)
     step = -np.sqrt(r @ r) / np.sqrt(v @ v)
     if step > -1:
