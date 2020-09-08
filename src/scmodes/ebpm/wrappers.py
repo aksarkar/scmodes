@@ -45,7 +45,7 @@ mass
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
-def _ebpm_gamma_obj(theta, x, s):
+def _ebpm_gamma_obj(theta, x, s, **kwargs):
   a, b = theta
   return st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x).sum()
 
@@ -67,15 +67,16 @@ a"""
   else:
     return init + step * d
 
-def _ebpm_gamma_update(theta, x, s):
+def _ebpm_gamma_update(theta, x, s, fix_a):
   a, b = theta
   pm = (x + a) / (s + b)
   plm = sp.digamma(x + a) - np.log(s + b)
   b = a / pm.mean()
-  a = _ebpm_gamma_update_a(a, b, plm)
+  if not fix_a:
+    a = _ebpm_gamma_update_a(a, b, plm)
   return np.array([a, b])
 
-def ebpm_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=True):
+def ebpm_gamma(x, s, a=None, max_iters=10000, tol=1e-3, extrapolate=True):
   """Return fitted parameters and marginal log likelihood assuming g is a Gamma
 distribution
 
@@ -87,16 +88,19 @@ distribution
   """
   x, s = _check_args(x, s)
   log_mean0, llik0 = ebpm_point(x, s)
-  # a = 1 / phi; b = 1 / (mu phi)
-  # Initialize mean at the Poisson MLE
-  init = np.array([1, s.sum() / x.sum()])
+  if a is None:
+    # a = 1 / phi; b = 1 / (mu phi)
+    # Initialize mean at the Poisson MLE
+    init = np.array([1, np.exp(-log_mean0)])
+  else:
+    init = np.array([a, a * np.exp(-log_mean0)])
   if extrapolate:
     theta, llik = _squarem(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
-                           max_iters=max_iters, tol=tol)
+                           fix_a=a is not None, max_iters=max_iters, tol=tol)
   else:
     theta, llik = _em(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
-                      max_iters=max_iters, tol=tol)
-  if llik < llik0:
+                      fix_a=a is not None, max_iters=max_iters, tol=tol)
+  if a is None and llik < llik0:
     # Just use the point mass model
     return log_mean0, np.inf, llik0
   else:
