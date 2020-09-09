@@ -45,7 +45,7 @@ mass
   mean = x.sum() / s.sum()
   return np.log(mean), st.poisson(mu=s * mean).logpmf(x).sum()
 
-def _ebpm_gamma_obj(theta, x, s, **kwargs):
+def _ebpm_gamma_obj(theta, x, s):
   a, b = theta
   return st.nbinom(n=a, p=1 / (1 + s / b)).logpmf(x).sum()
 
@@ -67,13 +67,20 @@ a"""
   else:
     return init + step * d
 
-def _ebpm_gamma_update(theta, x, s, fix_a):
+def _ebpm_gamma_update(theta, x, s):
   a, b = theta
   pm = (x + a) / (s + b)
   plm = sp.digamma(x + a) - np.log(s + b)
   b = a / pm.mean()
-  if not fix_a:
-    a = _ebpm_gamma_update_a(a, b, plm)
+  a = _ebpm_gamma_update_a(a, b, plm)
+  return np.array([a, b])
+
+def _ebpm_gamma_update_fix_a(theta, x, s):
+  # This is *much* faster than testing fix_a on every update
+  a, b = theta
+  pm = (x + a) / (s + b)
+  plm = sp.digamma(x + a) - np.log(s + b)
+  b = a / pm.mean()
   return np.array([a, b])
 
 def ebpm_gamma(x, s, a=None, max_iters=10000, tol=1e-3, extrapolate=True):
@@ -92,14 +99,16 @@ distribution
     # a = 1 / phi; b = 1 / (mu phi)
     # Initialize mean at the Poisson MLE
     init = np.array([1, np.exp(-log_mean0)])
+    update_fn = _ebpm_gamma_update
   else:
     init = np.array([a, a * np.exp(-log_mean0)])
+    update_fn = _ebpm_gamma_update_fix_a
   if extrapolate:
-    theta, llik = _squarem(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
-                           fix_a=a is not None, max_iters=max_iters, tol=tol)
+    theta, llik = _squarem(init, _ebpm_gamma_obj, update_fn, x=x, s=s,
+                           max_iters=max_iters, tol=tol)
   else:
-    theta, llik = _em(init, _ebpm_gamma_obj, _ebpm_gamma_update, x=x, s=s,
-                      fix_a=a is not None, max_iters=max_iters, tol=tol)
+    theta, llik = _em(init, _ebpm_gamma_obj, update_fn, x=x, s=s,
+                      max_iters=max_iters, tol=tol)
   if a is None and llik < llik0:
     # Just use the point mass model
     return log_mean0, np.inf, llik0
