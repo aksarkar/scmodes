@@ -46,14 +46,14 @@ def generalization_score_glmpca(train, test, n_components=10, tol=1e-4, max_iter
   lam = np.exp(l @ f.T)
   return pois_llik(lam, train, test)
 
-def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=200, **kwargs):
+def generalization_score_pvae(train, test, n_components=10, lr=1e-3, max_epochs=1600, **kwargs):
   n, p = train.shape
   x = torch.tensor(train, dtype=torch.float)
   m = (scmodes.lra.PVAE(p, n_components)
        .fit(x, lr=lr, max_epochs=max_epochs))
   return pois_llik(m.denoise(x, n_samples=100), train, test)
 
-def generalization_score_nbvae(train, test, n_components=10, lr=1e-3, max_epochs=200, **kwargs):
+def generalization_score_nbvae(train, test, n_components=10, lr=1e-3, max_epochs=1600, **kwargs):
   n, p = train.shape
   x = torch.tensor(train, dtype=torch.float)
   m = (scmodes.lra.NBVAE(p, n_components, disp_by_gene=True)
