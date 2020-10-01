@@ -137,6 +137,8 @@ def _ebpm_point_gamma_update_a(init, z, plm, b, step=1, c=0.5, tau=0.5, max_iter
   """Backtracking line search to select step size for Newton-Raphson update of
 a"""
   def loss(a):
+    if a <= 0:
+      return np.inf
     return -(z * (a * np.log(b) + a * plm - sp.gammaln(a))).sum()
   obj = loss(init)
   d = (z * (np.log(b) - sp.digamma(init) + plm)).sum() / (z * sp.polygamma(1, init)).sum()
@@ -163,7 +165,7 @@ def _ebpm_point_gamma_update(theta, x, s):
   a = _ebpm_point_gamma_update_a(a, z, plm, b)
   return np.array([logodds, a, b])
 
-def ebpm_point_gamma(x, s, max_iters=10000, tol=1e-3, extrapolate=True):
+def ebpm_point_gamma(x, s, init=None, max_iters=10000, tol=1e-3, extrapolate=True):
   """Return fitted parameters and marginal log likelihood assuming g is a
 point-Gamma distribution
 
@@ -174,7 +176,8 @@ point-Gamma distribution
 
   """
   x, s = _check_args(x, s)
-  init = np.array([8, 1, s.sum() / x.sum()])
+  if init is None:
+    init = np.array([8, 1, s.sum() / x.sum()])
   if extrapolate:
     theta, llik = _squarem(init, _ebpm_point_gamma_obj,
                            _ebpm_point_gamma_update, x=x, s=s,
