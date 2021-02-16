@@ -3,7 +3,7 @@ import setuptools
 setuptools.setup(
   name='scmodes',
   description='Investigation of single cell modes',
-  version='0.8',
+  version='0.9',
   url='https://www.github.com/aksarkar/scmodes',
   author='Abhishek Sarkar',
   author_email='aksarkar@uchicago.edu',
